@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{{ SITE_NAME }} — {% trans "Find your next property" %}{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-brand">
+    <img src="{% static 'img/propertica-brand-v.png' %}" alt="{{ SITE_NAME }}" class="hero-logo">
+  </div>
+  <h1>{% trans "Find your next property" %}</h1>
+  <p class="lead">{% trans "Houses, apartments, land and commercial spaces — one marketplace." %}</p>
+  <form action="{% url 'listings:search' %}" method="get" class="hero-search">
+    <input type="search" name="q" placeholder="{% trans 'City, neighbourhood…' %}" autofocus>
+    <select name="category">
+      <option value="">{% trans "Any type" %}</option>
+      {% for c in categories %}
+        <option value="{{ c.code }}">{{ c.label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-lg">{% trans "Search" %}</button>
+  </form>
+</section>
+
+<section class="category-tiles">
+  <h2>{% trans "Browse by type" %}</h2>
+  <div class="tile-grid">
+    {% for c in categories %}
+      <a class="tile" href="{% url 'listings:search' %}?category={{ c.code }}">
+        <span class="tile-label">{{ c.label }}</span>
+      </a>
+    {% empty %}
+      <p class="muted">{% trans "Categories will appear after seeding." %}</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="featured">
+  <h2>{% trans "Latest listings" %}</h2>
+  <div class="listing-grid">
+    {% for listing in featured_listings %}
+      {% include "listings/_card.html" with listing=listing %}
+    {% empty %}
+      <p class="muted">{% trans "No listings yet." %}</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

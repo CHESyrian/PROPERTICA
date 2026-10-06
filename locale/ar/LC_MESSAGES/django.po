@@ -1,0 +1,161 @@
+msgid ""
+msgstr ""
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+msgid "Buy"
+msgstr "شراء"
+
+msgid "Search"
+msgstr "بحث"
+
+msgid "Post a listing"
+msgstr "أضف عقاراً"
+
+msgid "Log in"
+msgstr "تسجيل الدخول"
+
+msgid "Register"
+msgstr "إنشاء حساب"
+
+msgid "Log out"
+msgstr "تسجيل الخروج"
+
+msgid "Messages"
+msgstr "الرسائل"
+
+msgid "Profile"
+msgstr "الملف الشخصي"
+
+msgid "Dashboard"
+msgstr "لوحة التحكم"
+
+msgid "Notifications"
+msgstr "الإشعارات"
+
+msgid "Theme"
+msgstr "المظهر"
+
+msgid "Language"
+msgstr "اللغة"
+
+msgid "Settings"
+msgstr "الإعدادات"
+
+msgid "City, neighbourhood…"
+msgstr "المدينة، الحي…"
+
+msgid "Find your next property"
+msgstr "اعثر على عقارك التالي"
+
+msgid "Terms"
+msgstr "الشروط"
+
+msgid "Privacy"
+msgstr "الخصوصية"
+
+msgid "Light"
+msgstr "فاتح"
+
+msgid "Dark"
+msgstr "داكن"
+
+msgid "Favorites"
+msgstr "المفضلة"
+
+msgid "Filters"
+msgstr "الفلاتر"
+
+msgid "Email"
+msgstr "البريد الإلكتروني"
+
+msgid "Password"
+msgstr "كلمة المرور"
+
+msgid "Confirm password"
+msgstr "تأكيد كلمة المرور"
+
+msgid "Account type"
+msgstr "نوع الحساب"
+
+msgid "No account yet?"
+msgstr "ليس لديك حساب؟"
+
+msgid "Already have an account?"
+msgstr "لديك حساب بالفعل؟"
+
+msgid "Welcome back to"
+msgstr "مرحباً بعودتك إلى"
+
+msgid "Create your account on"
+msgstr "أنشئ حسابك على"
+
+msgid "Edit listing"
+msgstr "تعديل العقار"
+
+msgid "Display name"
+msgstr "الاسم المعروض"
+
+msgid "Phone"
+msgstr "الهاتف"
+
+msgid "Property type"
+msgstr "نوع العقار"
+
+msgid "Basic details"
+msgstr "التفاصيل الأساسية"
+
+msgid "Location"
+msgstr "الموقع"
+
+msgid "Property details"
+msgstr "تفاصيل العقار"
+
+msgid "Photos"
+msgstr "الصور"
+
+msgid "Review & publish"
+msgstr "مراجعة ونشر"
+
+msgid "Follow these six steps to publish your property."
+msgstr "اتبع هذه الخطوات الست لنشر عقارك."
+
+msgid "Choose house, apartment, land, or commercial."
+msgstr "اختر منزلاً أو شقة أو أرضاً أو عقاراً تجارياً."
+
+msgid "Title, description, price, and currency."
+msgstr "العنوان والوصف والسعر والعملة."
+
+msgid "Address and map pin for your property."
+msgstr "العنوان ودبوس الخريطة لعقارك."
+
+msgid "Rooms, area, and type-specific attributes."
+msgstr "الغرف والمساحة والخصائص حسب النوع."
+
+msgid "Upload images and set a cover photo."
+msgstr "ارفع الصور واختر صورة الغلاف."
+
+msgid "Check everything, then save as draft or publish."
+msgstr "راجع كل شيء ثم احفظ كمسودة أو انشر."
+
+msgid "Houses, apartments, land and commercial spaces — one marketplace."
+msgstr "منازل وشقق وأراضٍ ومساحات تجارية — في سوق واحد."
+
+msgid "Any type"
+msgstr "أي نوع"
+
+msgid "Browse by type"
+msgstr "تصفح حسب النوع"
+
+msgid "Categories will appear after seeding."
+msgstr "ستظهر الفئات بعد تهيئة البيانات."
+
+msgid "Latest listings"
+msgstr "أحدث العقارات"
+
+msgid "No listings yet."
+msgstr "لا توجد عقارات بعد."

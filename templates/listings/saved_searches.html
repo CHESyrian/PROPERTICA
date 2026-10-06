@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Saved searches" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="dashboard"><header class="dash-header">
+    <div>
+      <h1>{% trans "Saved searches" %}</h1>
+      <p class="muted">Re-run a search or manage email notifications.</p>
+    </div>
+    <div class="dash-actions">
+      <a href="{% url 'listings:search' %}" class="btn btn-primary">{% trans "New search" %}</a>
+      <a href="{% url 'accounts:dashboard' %}" class="btn">{% trans "Dashboard" %}</a>
+    </div>
+  </header>
+
+  {% if saved_searches %}
+    <ul class="saved-search-list">
+      {% for ss in saved_searches %}
+        <li class="saved-search-item">
+          <div class="saved-search-main">
+            <strong>{{ ss.name|default:"Untitled search" }}</strong>
+            <span class="muted">· saved {{ ss.created_at|timesince }} ago</span>
+            <p class="muted filters-preview">
+              {% if ss.filters.q %}q: {{ ss.filters.q }} · {% endif %}
+              {% if ss.filters.category %}category: {{ ss.filters.category }} · {% endif %}
+              {% if ss.filters.city %}city: {{ ss.filters.city }} · {% endif %}
+              {% if ss.filters.price_min %}min: {{ ss.filters.price_min }} · {% endif %}
+              {% if ss.filters.price_max %}max: {{ ss.filters.price_max }} · {% endif %}
+              sort: {{ ss.filters.sort|default:"newest" }}
+            </p>
+          </div>
+          <div class="saved-search-actions">
+            <a class="btn btn-sm btn-primary"
+               href="{% url 'listings:search' %}?q={{ ss.filters.q|urlencode }}&category={{ ss.filters.category|urlencode }}&city={{ ss.filters.city|urlencode }}&price_min={{ ss.filters.price_min|urlencode }}&price_max={{ ss.filters.price_max|urlencode }}&sort={{ ss.filters.sort|default:'newest'|urlencode }}">
+              Run again
+            </a>
+            <form method="post" action="{% url 'listings:saved_search_update' ss.pk %}" class="inline-form">
+              {% csrf_token %}
+              <input type="text" name="name" value="{{ ss.name }}" maxlength="120" aria-label="Name">
+              <label class="checkbox-label">
+                <input type="checkbox" name="notify_by_email" {% if ss.notify_by_email %}checked{% endif %}>
+                Notify
+              </label>
+              <button type="submit" class="btn btn-sm">Update</button>
+            </form>
+            <form method="post" action="{% url 'listings:saved_search_delete' ss.pk %}"
+                  onsubmit="return confirm('Delete this saved search?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm">Delete</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">You have no saved searches yet. Run a search and click “Save search”.</p>
+  {% endif %}
+</div>
+{% endblock %}

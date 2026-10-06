@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}Messages — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}<div class="inbox">
+  <h1>Messages</h1>
+  <p class="muted">Conversations about listings you’re buying or selling.</p>
+
+  {% if threads %}
+    <ul class="thread-list">
+      {% for t in threads %}
+        <li class="thread-item {% if t.unread_count %}unread{% endif %}">
+          <a href="{% url 'messaging:thread' t.pk %}">
+            <div class="thread-main">
+              <span class="thread-listing">{{ t.listing.title }}</span>
+              <span class="thread-party">
+                {% if t.buyer_id == user.id %}
+                  To: {{ t.seller.resolved_display_name }}
+                {% else %}
+                  From: {{ t.buyer.resolved_display_name }}
+                {% endif %}
+              </span>
+              <span class="thread-preview">{{ t.last_message_body|default:"(no messages yet)"|truncatechars:80 }}</span>
+            </div>
+            <div class="thread-meta">
+              {% if t.unread_count %}
+                <span class="unread-badge">{{ t.unread_count }}</span>
+              {% endif %}
+              <time>
+                {% if t.last_message_at %}{{ t.last_message_at|timesince }}{% else %}{{ t.created_at|timesince }}{% endif %} ago
+              </time>
+            </div>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty-state">
+      <p>No conversations yet.</p>
+      <p class="muted">When you contact a seller about a listing, the thread will appear here.</p>
+      <a href="{% url 'listings:search' %}" class="btn btn-primary">Browse listings</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

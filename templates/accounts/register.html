@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Register" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card auth-card-wide">
+    <div class="auth-card-brand">
+      <img src="{% static 'img/propertica-brand-v.png' %}" alt="{{ SITE_NAME }}" class="auth-logo">
+    </div>
+    <h1 class="auth-title">{% trans "Register" %}</h1>
+    <p class="auth-subtitle muted">{% trans "Create your account on" %} {{ SITE_NAME }}</p>
+
+    <form method="post" class="auth-form" x-data="{ showPw1: false, showPw2: false }">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <fieldset class="account-type-fieldset">
+        <legend>{% trans "Account type" %}</legend>
+        <div class="account-type-cards">
+          {% for radio in form.account_type %}
+            <label class="account-type-option">
+              {{ radio.tag }}
+              <span class="account-type-body">{{ radio.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% if form.account_type.errors %}<span class="field-error">{{ form.account_type.errors.0 }}</span>{% endif %}
+      </fieldset>
+
+      <label>
+        {% trans "Email" %}
+        {{ form.email }}
+        {% if form.email.errors %}<span class="field-error">{{ form.email.errors.0 }}</span>{% endif %}
+      </label>
+      <label>
+        {% trans "Password" %}
+        <div class="password-field">
+          <input type="password"
+                 name="{{ form.password1.name }}"
+                 id="id_password1"
+                 autocomplete="new-password"
+                 placeholder="••••••••"
+                 :type="showPw1 ? 'text' : 'password'"
+                 required>
+          <button type="button"
+                  class="password-toggle"
+                  @click="showPw1 = !showPw1"
+                  :aria-label="showPw1 ? '{% trans "Hide password" %}' : '{% trans "Show password" %}'">
+            <template x-if="!showPw1">
+              <i class="bi bi-eye" aria-hidden="true"></i>
+            </template>
+            <template x-if="showPw1">
+              <i class="bi bi-eye-slash" aria-hidden="true"></i>
+            </template>
+          </button>
+        </div>
+        {% if form.password1.errors %}<span class="field-error">{{ form.password1.errors.0 }}</span>{% endif %}
+      </label>
+      <label>
+        {% trans "Confirm password" %}
+        <div class="password-field">
+          <input type="password"
+                 name="{{ form.password2.name }}"
+                 id="id_password2"
+                 autocomplete="new-password"
+                 placeholder="••••••••"
+                 :type="showPw2 ? 'text' : 'password'"
+                 required>
+          <button type="button"
+                  class="password-toggle"
+                  @click="showPw2 = !showPw2"
+                  :aria-label="showPw2 ? '{% trans "Hide password" %}' : '{% trans "Show password" %}'">
+            <template x-if="!showPw2">
+              <i class="bi bi-eye" aria-hidden="true"></i>
+            </template>
+            <template x-if="showPw2">
+              <i class="bi bi-eye-slash" aria-hidden="true"></i>
+            </template>
+          </button>
+        </div>
+        {% if form.password2.errors %}<span class="field-error">{{ form.password2.errors.0 }}</span>{% endif %}
+      </label>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg">{% trans "Register" %}</button>
+    </form>
+
+    <p class="auth-footer">
+      {% trans "Already have an account?" %}
+      <a href="{% url 'accounts:login' %}">{% trans "Log in" %}</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

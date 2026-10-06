@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Notifications" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="dashboard"><header class="dash-header">
+    <div>
+      <h1>{% trans "Notifications" %}</h1>
+      <p class="muted">
+        {% if unread_count %}{{ unread_count }} unread{% else %}All caught up{% endif %}
+      </p>
+    </div>
+    <div class="dash-actions">
+      {% if unread_count %}
+        <form method="post" action="{% url 'messaging:notifications_mark_all' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn">{% trans "Mark all read" %}</button>
+        </form>
+      {% endif %}
+      <a href="{% url 'messaging:inbox' %}" class="btn">{% trans "Inbox" %}</a>
+    </div>
+  </header>
+
+  {% if notifications %}
+    <ul class="notification-list">
+      {% for n in notifications %}
+        <li class="notification-item {% if not n.is_read %}is-unread{% endif %}">
+          <div class="notification-main">
+            <strong>{{ n.title }}</strong>
+            <span class="muted">· {{ n.created_at|timesince }} ago</span>
+            {% if n.body %}<p class="muted">{{ n.body|truncatechars:160 }}</p>{% endif %}
+          </div>
+          <div class="notification-actions">
+            {% if n.link %}
+              <a class="btn btn-sm btn-primary" href="{{ n.link }}">Open</a>
+            {% endif %}
+            {% if not n.is_read %}
+              <form method="post" action="{% url 'messaging:notification_mark_read' n.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm">Mark read</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if page_obj.has_other_pages %}
+      <nav class="pagination">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        {% endif %}
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <p class="muted">No notifications yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

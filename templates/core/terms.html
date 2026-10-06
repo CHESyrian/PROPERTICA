@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Terms of Service" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<article class="static-page legal"><h1>{% trans "Terms of Service" %}</h1>
+  <p class="muted">Last updated: September 2026 · Placeholder for legal review</p>
+
+  <h2>1. Acceptance</h2>
+  <p>
+    By accessing or using {{ SITE_NAME }} (“the Service”), you agree to these
+    Terms of Service. If you do not agree, do not use the Service.
+  </p>
+
+  <h2>2. The Service</h2>
+  <p>
+    {{ SITE_NAME }} is a marketplace for real estate listings offered for sale.
+    We do not own the properties listed, do not broker transactions, and are not
+    a party to any sale between users. Listings are provided by independent
+    sellers, agents, and agencies.
+  </p>
+
+  <h2>3. Accounts</h2>
+  <p>
+    You must provide accurate registration information. You are responsible for
+    activity under your account. Account types (Personal, Agent, Agency) have
+    different capabilities as described in the product. We may suspend or
+    terminate accounts that violate these terms or applicable law.
+  </p>
+
+  <h2>4. Listings and content</h2>
+  <p>
+    You retain ownership of content you submit. By posting a listing you grant
+    us a license to display, distribute, and promote it on the Service. You
+    represent that you have the right to list the property and that information
+    and photos are accurate and not misleading. We may remove content that
+    violates these terms, is fraudulent, or is reported by users.
+  </p>
+
+  <h2>5. Prohibited use</h2>
+  <p>
+    You may not use the Service to post fraudulent or illegal listings, scrape
+    data, harass other users, circumvent security or rate limits, or violate
+    any applicable real-estate advertising laws.
+  </p>
+
+  <h2>6. Disclaimers</h2>
+  <p>
+    The Service is provided “as is.” We do not guarantee the accuracy of
+    listings, the identity of users, or the outcome of any inquiry or
+    transaction. Always verify property details and counterparties independently.
+  </p>
+
+  <h2>7. Limitation of liability</h2>
+  <p>
+    To the fullest extent permitted by law, {{ SITE_NAME }} and its operators
+    are not liable for indirect, incidental, or consequential damages arising
+    from your use of the Service.
+  </p>
+
+  <h2>8. Changes</h2>
+  <p>
+    We may update these terms from time to time. Continued use after changes
+    constitutes acceptance of the revised terms.
+  </p>
+
+  <h2>9. Contact</h2>
+  <p>
+    Questions about these terms: <a href="{% url 'core:contact' %}">Contact us</a>.
+  </p>
+</article>
+{% endblock %}

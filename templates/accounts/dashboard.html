@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Dashboard" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="dashboard"><header class="dash-header">
+    <div>
+      <h1>{% trans "Dashboard" %}</h1>
+      <p class="muted">
+        {{ user.resolved_display_name }}
+        · <code>{{ user.username }}</code>
+        · {{ user.get_account_type_display }}
+        {% if user.plan %} · {{ user.plan.label }} plan{% endif %}
+      </p>
+    </div>
+    <div class="dash-actions">
+      <a href="{% url 'listings:create' %}" class="btn btn-primary">{% trans "Post a listing" %}</a>
+      <a href="{% url 'messaging:inbox' %}" class="btn">{% trans "Messages" %}</a>
+      <a href="{% url 'listings:saved_searches' %}" class="btn">{% trans "Saved searches" %}</a>
+      <a href="{% url 'accounts:profile' %}" class="btn">{% trans "Profile" %}</a>
+    </div>
+  </header>
+
+  <div class="stat-grid">
+    <div class="stat-card"><span class="stat-n">{{ stats.total }}</span><span class="stat-l">Total</span></div>
+    <div class="stat-card"><span class="stat-n">{{ stats.active }}</span><span class="stat-l">Active</span></div>
+    <div class="stat-card"><span class="stat-n">{{ stats.draft }}</span><span class="stat-l">Draft</span></div>
+    <div class="stat-card"><span class="stat-n">{{ stats.under_offer }}</span><span class="stat-l">Under offer</span></div>
+    <div class="stat-card"><span class="stat-n">{{ stats.sold }}</span><span class="stat-l">Sold</span></div>
+    <div class="stat-card"><span class="stat-n">{{ stats.total_views|default:0 }}</span><span class="stat-l">Views</span></div>
+    <div class="stat-card"><span class="stat-n">{{ stats.total_leads|default:0 }}</span><span class="stat-l">Leads</span></div>
+  </div>
+
+  {% if quota.max_active is not None %}
+    <p class="quota-note {% if quota.at_limit %}quota-at-limit{% endif %}">
+      {% if quota.at_limit %}
+        You have used all {{ quota.max_active }} active listing{{ quota.max_active|pluralize }} on your plan.
+        Unpublish or mark a listing as sold before publishing another.
+      {% else %}
+        Active listings: {{ quota.active }} of {{ quota.max_active }} used.
+      {% endif %}
+    </p>
+  {% endif %}
+
+  {% if REQUIRE_ACCOUNT_VERIFICATION and not user.email_verified_at %}
+    <p class="quota-note quota-at-limit">
+      {% trans "Please verify your email" %} —
+      <a href="{% url 'accounts:profile' %}">{% trans "send a link from your profile" %}</a>.
+    </p>
+  {% elif not user.email_verified_at %}
+    <p class="quota-note">
+      {% trans "Optional:" %}
+      <a href="{% url 'accounts:profile' %}">{% trans "verify your email" %}</a>
+      {% trans "to build trust with buyers." %}
+    </p>
+  {% endif %}
+
+  {% if is_agent and pending_invites %}
+    <section class="dash-section">
+      <h2>Agency invites</h2>
+      <ul class="invite-list">
+        {% for inv in pending_invites %}
+          <li class="invite-item">
+            <div>
+              <strong>{{ inv.agency.resolved_display_name }}</strong>
+              <span class="muted">invited you · {{ inv.invited_at|timesince }} ago</span>
+            </div>
+            <div class="invite-actions">
+              <form method="post" action="{% url 'accounts:agency_accept' inv.pk %}">{% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+              </form>
+              <form method="post" action="{% url 'accounts:agency_decline' inv.pk %}">{% csrf_token %}
+                <button type="submit" class="btn btn-sm">Decline</button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  {% if is_agency %}
+    <section class="dash-section">
+      <h2>Agency team</h2>
+      <form method="post" action="{% url 'accounts:agency_invite' %}" class="invite-form">
+        {% csrf_token %}
+        <input type="email" name="email" placeholder="agent@example.com" required>
+        <button type="submit" class="btn btn-primary">Invite agent</button>
+      </form>
+      <p class="hint muted">Agent must already have an Agent account.</p>
+      <table class="data-table">
+        <thead>
+          <tr><th>Agent</th><th>Email</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for link in agency_agents %}
+            <tr>
+              <td>{{ link.agent.resolved_display_name }} <code>{{ link.agent.username }}</code></td>
+              <td>{{ link.agent.email }}</td>
+              <td><span class="badge status-{{ link.status }}">{{ link.get_status_display }}</span></td>
+              <td>
+                {% if link.status != "removed" %}
+                  <form method="post" action="{% url 'accounts:agency_remove' link.pk %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4">No agents yet. Invite one by email.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+
+      <section class="dash-section">
+    <h2>Your listings</h2>
+    <form method="post" action="{% url 'listings:bulk_status' %}" id="bulk-listings-form" style="margin-bottom:0.75rem">
+      {% csrf_token %}
+      <div class="bulk-toolbar" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+        <span class="muted">Bulk status:</span>
+        <select name="status">
+          <option value="draft">Draft</option>
+          <option value="active">Active (publish)</option>
+          <option value="under_offer">Under offer</option>
+          <option value="sold">Sold</option>
+        </select>
+        <button type="submit" class="btn btn-sm" onclick="return confirm('Apply to selected listings?')">Apply to selected</button>
+      </div>
+    </form>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Price</th>
+          <th>City</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for listing in my_listings %}
+          <tr>
+            <td><input type="checkbox" form="bulk-listings-form" name="listing_ids" value="{{ listing.pk }}" aria-label="Select"></td>
+            <td>
+              <a href="{% url 'listings:detail' listing.pk %}">{{ listing.title }}</a>
+              <div class="muted" style="font-size:.8rem">{{ listing.category.label }} · updated {{ listing.updated_at|timesince }} ago</div>
+            </td>
+            <td>
+              <span class="badge status-{{ listing.status }}">{{ listing.get_status_display }}</span>
+              {% if listing.view_count %}<span class="muted" style="font-size:.8rem"> · {{ listing.view_count }} views</span>{% endif %}
+            </td>
+            <td>{{ listing.currency }} {{ listing.price|floatformat:0 }}</td>
+            <td>{{ listing.city }}</td>
+            <td class="actions-cell">
+              <a href="{% url 'listings:edit' listing.pk %}" class="btn btn-sm">Edit</a>
+              {% if listing.status == "draft" %}
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="active">
+                  <button type="submit" class="btn btn-sm btn-primary">Publish</button>
+                </form>
+              {% endif %}
+              {% if listing.status == "active" %}
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="under_offer">
+                  <button type="submit" class="btn btn-sm">Under offer</button>
+                </form>
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="sold">
+                  <button type="submit" class="btn btn-sm">Sold</button>
+                </form>
+                <form method="post" action="{% url 'listings:feature' listing.pk %}">{% csrf_token %}
+                  <button type="submit" class="btn btn-sm"{% if not can_feature %} title="Not available on free plan"{% endif %}>Feature</button>
+                </form>
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="draft">
+                  <button type="submit" class="btn btn-sm">Unpublish</button>
+                </form>
+              {% endif %}
+              {% if listing.status == "under_offer" %}
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="active">
+                  <button type="submit" class="btn btn-sm">Back to active</button>
+                </form>
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="sold">
+                  <button type="submit" class="btn btn-sm btn-primary">Mark sold</button>
+                </form>
+              {% endif %}
+              {% if listing.status == "sold" %}
+                <form method="post" action="{% url 'listings:set_status' listing.pk %}">{% csrf_token %}
+                  <input type="hidden" name="status" value="active">
+                  <button type="submit" class="btn btn-sm">Re-list</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6">No listings yet. <a href="{% url 'listings:create' %}">Post your first property</a>.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

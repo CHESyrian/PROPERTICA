@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Log in" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-card-brand">
+      <img src="{% static 'img/propertica-brand-v.png' %}" alt="{{ SITE_NAME }}" class="auth-logo">
+    </div>
+    <h1 class="auth-title">{% trans "Log in" %}</h1>
+    <p class="auth-subtitle muted">{% trans "Welcome back to" %} {{ SITE_NAME }}</p>
+
+    <form method="post" class="auth-form" x-data="{ showPw: false }">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <label>
+        {% trans "Email" %}
+        {{ form.username }}
+        {% if form.username.errors %}<span class="field-error">{{ form.username.errors.0 }}</span>{% endif %}
+      </label>
+      <label>
+        {% trans "Password" %}
+        <div class="password-field">
+          <input type="password"
+                 name="{{ form.password.name }}"
+                 id="id_password"
+                 autocomplete="current-password"
+                 placeholder="••••••••"
+                 :type="showPw ? 'text' : 'password'"
+                 required>
+          <button type="button"
+                  class="password-toggle"
+                  @click="showPw = !showPw"
+                  :aria-label="showPw ? '{% trans "Hide password" %}' : '{% trans "Show password" %}'"
+                  :title="showPw ? '{% trans "Hide password" %}' : '{% trans "Show password" %}'">
+            <template x-if="!showPw">
+              <i class="bi bi-eye" aria-hidden="true"></i>
+            </template>
+            <template x-if="showPw">
+              <i class="bi bi-eye-slash" aria-hidden="true"></i>
+            </template>
+          </button>
+        </div>
+        {% if form.password.errors %}<span class="field-error">{{ form.password.errors.0 }}</span>{% endif %}
+      </label>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">{% trans "Log in" %}</button>
+    </form>
+
+    {% if OAUTH_ENABLED %}
+      <p class="muted" style="text-align:center;margin-top:1rem">
+        <button type="button" class="btn" disabled title="Configure GOOGLE_OAUTH_* env vars">Continue with Google</button>
+      </p>
+    {% else %}
+      <p class="muted" style="text-align:center;margin-top:1rem;font-size:.85rem">
+        Social login can be enabled by setting <code>GOOGLE_OAUTH_CLIENT_ID</code> &amp; secret.
+      </p>
+    {% endif %}
+
+    <p class="auth-footer muted">
+      {% trans "No account?" %}
+      <a href="{% url 'accounts:register' %}">{% trans "Register" %}</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

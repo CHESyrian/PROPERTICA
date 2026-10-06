@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "About" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<article class="static-page"><h1>{% trans "About Propertica" %}</h1>
+  <p class="lead">
+    Propertica is a real estate listings marketplace where property owners,
+    agents, and agencies list homes, land, and commercial properties for sale —
+    and buyers search, filter, and inquire in one place.
+  </p>
+
+  <h2>Our mission</h2>
+  <p>
+    Buyers often have to check multiple fragmented sources to find relevant
+    listings. Sellers and agents need a simple way to publish listings that
+    reach a wide audience. We centralize supply and demand into one searchable,
+    trustworthy marketplace.
+  </p>
+
+  <h2>Who it’s for</h2>
+  <ul>
+    <li><strong>Buyers</strong> — powerful search and filters, accurate details, easy contact with sellers.</li>
+    <li><strong>Private sellers</strong> — simple listing creation and lead management.</li>
+    <li><strong>Agents &amp; agencies</strong> — multi-listing tools, branded profiles, and inbox for inquiries.</li>
+  </ul>
+
+  <h2>What’s in v1</h2>
+  <p>
+    Sale listings only (houses, apartments, land, commercial). Free plan for
+    all account types. Messaging between buyers and sellers. More features —
+    including paid plans and advanced search — are on the roadmap.
+  </p>
+
+  <p>
+    <a href="{% url 'core:contact' %}" class="btn btn-primary">{% trans "Contact us" %}</a>
+    <a href="{% url 'listings:search' %}" class="btn">{% trans "Browse listings" %}</a>
+  </p>
+</article>
+{% endblock %}

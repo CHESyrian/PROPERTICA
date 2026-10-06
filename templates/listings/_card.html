@@ -1,0 +1,34 @@
+<article class="listing-card" data-listing-id="{{ listing.pk }}">
+  <div class="card-image-wrap">
+    <a href="{% url 'listings:detail' listing.pk %}">
+      <div class="card-image">
+        {% with cover=listing.media.first %}
+          {% if cover and cover.display_url %}
+            <img src="{{ cover.display_url }}" alt="{{ listing.title }}">
+          {% else %}
+            <div class="placeholder-img">No photo</div>
+          {% endif %}
+        {% endwith %}
+      </div>
+    </a>
+    {% if user.is_authenticated %}
+      <button type="button"
+              class="fav-btn {% if listing.pk in favorited_ids %}is-fav{% endif %}"
+              data-fav-url="{% url 'listings:favorite' listing.pk %}"
+              data-favorited="{% if listing.pk in favorited_ids %}1{% else %}0{% endif %}"
+              title="Favorite"
+              aria-label="Favorite"
+              aria-pressed="{% if listing.pk in favorited_ids %}true{% else %}false{% endif %}">
+        <i class="bi {% if listing.pk in favorited_ids %}bi-heart-fill{% else %}bi-heart{% endif %} fav-heart" aria-hidden="true"></i>
+      </button>
+    {% endif %}
+  </div>
+  <a href="{% url 'listings:detail' listing.pk %}" class="card-body-link">
+    <div class="card-body">
+      <p class="price">{{ listing.currency }} {{ listing.price|floatformat:0 }}</p>
+      <h3>{{ listing.title }}</h3>
+      <p class="meta">{{ listing.city }}{% if listing.area_value %} · {{ listing.area_value }} m²{% endif %}</p>
+      <span class="badge">{{ listing.category.label }}</span>
+    </div>
+  </a>
+</article>

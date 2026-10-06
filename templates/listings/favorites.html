@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Favorites" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="favorites-page"><h1>{% trans "Favorites" %}</h1>
+  <p class="muted">Listings you saved.</p>
+  <div class="listing-grid" style="margin-top:1.25rem">
+    {% for listing in listings %}
+      {% include "listings/_card.html" with listing=listing %}
+    {% empty %}
+      <p class="empty-state">No favorites yet. Heart a listing to save it here.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

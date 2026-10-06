@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{{ listing.title }} — {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<link rel="canonical" href="{{ request.build_absolute_uri }}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ listing.title }}">
+<meta property="og:description" content="{{ listing.description|truncatechars:160 }}">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+{% if og_image %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ og_image }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ listing.title }}">
+<meta name="twitter:description" content="{{ listing.description|truncatechars:160 }}">
+{% if og_image %}<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ og_image }}">{% endif %}
+{% if json_ld %}<script type="application/ld+json">{{ json_ld|safe }}</script>{% endif %}
+{% endblock %}
+
+{% block content %}
+<article class="listing-detail">
+  {# Full-width hero carousel #}
+  <section class="listing-hero-carousel"
+           x-data="listingCarousel({{ listing.media.count }})"
+           x-init="start()"
+           @mouseenter="pause()"
+           @mouseleave="if (!lightbox) start()"
+           @keydown.escape.window="lightbox = false; start()"
+           @keydown.left.window="prev()"
+           @keydown.right.window="next()">
+    {% if listing.media.all %}
+      <div class="carousel-track">
+        {% for m in listing.media.all %}
+          <div class="carousel-slide"
+               :class="{ 'is-active': index === {{ forloop.counter0 }} }"
+               :aria-hidden="(index !== {{ forloop.counter0 }}).toString()">
+            <img src="{{ m.display_url }}"
+                 alt="{{ m.alt_text|default:listing.title }}"
+                 data-full="{{ m.display_url }}"
+                 @click="openLightbox({{ forloop.counter0 }})"
+                 {% if forloop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if listing.media.count > 1 %}
+        <button type="button" class="carousel-nav carousel-prev" @click="prev()" aria-label="Previous photo">
+          <i class="bi bi-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="carousel-nav carousel-next" @click="next()" aria-label="Next photo">
+          <i class="bi bi-chevron-right" aria-hidden="true"></i>
+        </button>
+
+        <div class="carousel-indicators" role="tablist" aria-label="Photo indicators">
+          {% for m in listing.media.all %}
+            <button type="button"
+                    class="carousel-dot"
+                    role="tab"
+                    :class="{ 'is-active': index === {{ forloop.counter0 }} }"
+                    :aria-selected="(index === {{ forloop.counter0 }}).toString()"
+                    @click="go({{ forloop.counter0 }})"
+                    aria-label="Photo {{ forloop.counter }}"></button>
+          {% endfor %}
+        </div>
+        <div class="carousel-counter">
+          <span x-text="index + 1"></span> / {{ listing.media.count }}
+        </div>
+      {% endif %}
+
+      {# Full-size image modal #}
+      <div class="carousel-lightbox" x-show="lightbox" x-cloak
+           @click.self="lightbox = false; start()"
+           style="display:none" x-bind:style="lightbox ? 'display:flex' : 'display:none'">
+        <button type="button" class="carousel-lightbox-close" @click="lightbox = false; start()" aria-label="Close">&times;</button>
+        {% if listing.media.count > 1 %}
+          <button type="button" class="carousel-lightbox-nav prev" @click.stop="prev()" aria-label="Previous">
+            <i class="bi bi-chevron-left" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="carousel-lightbox-nav next" @click.stop="next()" aria-label="Next">
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          </button>
+        {% endif %}
+        <img :src="lightboxSrc" alt="{{ listing.title }}" @click.stop>
+      </div>
+    {% else %}
+      <div class="carousel-empty">
+        <span>No photos yet</span>
+      </div>
+    {% endif %}
+  </section>
+
+  <div class="detail-grid">
+    <div class="detail-main">
+      <div class="detail-title-row">
+        <h1>{{ listing.title }}</h1>
+        <div class="title-actions">
+          {% if user.is_authenticated %}
+            <button type="button"
+                    class="fav-btn large {% if is_favorited %}is-fav{% endif %}"
+                    data-fav-url="{% url 'listings:favorite' listing.pk %}"
+                    data-favorited="{% if is_favorited %}1{% else %}0{% endif %}"
+                    aria-pressed="{% if is_favorited %}true{% else %}false{% endif %}"
+                    title="Favorite"
+                    aria-label="Favorite">
+              <i class="bi {% if is_favorited %}bi-heart-fill{% else %}bi-heart{% endif %} fav-heart" aria-hidden="true"></i>
+            </button>
+          {% endif %}
+          <button type="button" class="btn btn-sm share-btn" id="share-listing-btn"
+                  data-url="{{ request.build_absolute_uri }}" data-title="{{ listing.title|escapejs }}">
+            Share
+          </button>
+        </div>
+      </div>
+      <p class="price">{{ listing.currency }} {{ listing.price|floatformat:0 }}
+        {% if listing.negotiable %}<span class="badge">Negotiable</span>{% endif %}
+      </p>
+      <p class="location">{{ listing.address_line }}{% if listing.city %}, {{ listing.city }}{% endif %}{% if listing.country %}, {{ listing.country }}{% endif %}</p>
+      <p class="meta">{{ listing.category.label }}
+        {% if listing.area_value %} · {{ listing.area_value }} m²{% endif %}
+        {% if listing.published_at %} · Posted {{ listing.published_at|date:"M j, Y" }}{% endif %}
+      </p>
+      <div class="description">
+        {{ listing.description|linebreaks }}
+      </div>
+      {% if listing.type_attributes %}
+        <h2>Details</h2>
+        <table class="attrs">
+          {% for key, val in listing.type_attributes.items %}
+            <tr><th>{{ key|title }}</th><td>{{ val }}</td></tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+
+      {% if listing.latitude and listing.longitude %}
+        <h2>Map</h2>
+        <div id="detail-map" class="listing-map"
+             data-lat="{{ listing.latitude }}"
+             data-lng="{{ listing.longitude }}"
+             data-lang="{{ CURRENT_LANGUAGE|default:'en'|slice:':2' }}"></div>
+      {% endif %}
+
+      {% if similar_listings %}
+        <section class="similar-section">
+          <h2>Similar listings</h2>
+          <div class="card-grid">
+            {% for s in similar_listings %}
+              {% include "listings/_card.html" with listing=s %}
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+    </div>
+
+    <aside class="detail-sidebar">
+      <div class="owner-card">
+        <p class="owner-name">
+          {% if listing.owner.account_type == "agency" %}
+            <a href="{% url 'accounts:agency_public' listing.owner.username %}">{{ listing.owner.resolved_display_name }}</a>
+          {% elif listing.owner.agency_id %}
+            <a href="{% url 'accounts:agency_public' listing.owner.agency.username %}">{{ listing.owner.resolved_display_name }}</a>
+          {% else %}
+            <a href="{% url 'accounts:public_profile' listing.owner.username %}">{{ listing.owner.resolved_display_name }}</a>
+          {% endif %}
+        </p>
+        <p class="owner-type badge">{{ listing.owner.get_account_type_display }}</p>
+
+        {% if user.is_authenticated %}
+          {% if user.id == listing.owner_id %}
+            <p class="muted">This is your listing.</p>
+            <a href="{% url 'listings:edit' listing.pk %}" class="btn btn-primary btn-block">Edit listing</a>
+            <a href="{% url 'accounts:dashboard' %}" class="btn btn-block" style="margin-top:.5rem">Dashboard</a>
+          {% else %}
+            {% if has_phone %}
+              <button type="button" class="btn btn-block" id="reveal-phone-btn"
+                      data-url="{% url 'listings:phone_reveal' listing.pk %}">
+                Show phone number
+              </button>
+              <p id="phone-display" class="phone-display muted" hidden></p>
+            {% endif %}
+
+            {% if existing_thread %}
+              <p class="muted" style="margin-top:.75rem">You already have a conversation.</p>
+              <a href="{% url 'messaging:thread' existing_thread.pk %}" class="btn btn-primary btn-block">Open conversation</a>
+            {% else %}
+              <form method="post" action="{% url 'messaging:contact' listing.pk %}" class="contact-form">
+                {% csrf_token %}
+                <label for="id_body">Contact seller</label>
+                {{ contact_form.body }}
+                <button type="submit" class="btn btn-primary btn-block">Send message</button>
+              </form>
+            {% endif %}
+
+            <details class="report-box">
+              <summary>Report this listing</summary>
+              <form method="post" action="{% url 'listings:report' listing.pk %}" class="report-form">
+                {% csrf_token %}
+                <label>Reason
+                  <select name="reason">
+                    <option value="fraud">Fraud / scam</option>
+                    <option value="incorrect">Incorrect info</option>
+                    <option value="spam">Spam</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label>Details
+                  <textarea name="details" rows="3" placeholder="Optional details…"></textarea>
+                </label>
+                <button type="submit" class="btn btn-sm">Submit report</button>
+              </form>
+            </details>
+          {% endif %}
+        {% else %}
+          <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="btn btn-primary btn-block">Log in to contact</a>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</article>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function listingCarousel(total) {
+  return {
+    index: 0,
+    total: Math.max(0, Number(total) || 0),
+    timer: null,
+    lightbox: false,
+    get lightboxSrc() {
+      var slides = document.querySelectorAll('.listing-hero-carousel .carousel-slide img');
+      if (!slides.length) return '';
+      var img = slides[this.index];
+      return img ? (img.getAttribute('data-full') || img.src) : '';
+    },
+    start() {
+      this.stop();
+      if (this.lightbox || this.total <= 1) return;
+      this.timer = setInterval(() => this.next(), 2000);
+    },
+    stop() {
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = null;
+      }
+    },
+    pause() { this.stop(); },
+    next() {
+      if (this.total <= 0) return;
+      this.index = (this.index + 1) % this.total;
+    },
+    prev() {
+      if (this.total <= 0) return;
+      this.index = (this.index - 1 + this.total) % this.total;
+    },
+    go(i) {
+      if (i < 0 || i >= this.total) return;
+      this.index = i;
+      if (!this.lightbox) this.start();
+    },
+    openLightbox(i) {
+      if (typeof i === 'number') this.index = i;
+      this.lightbox = true;
+      this.pause();
+    },
+  };
+}
+(function () {
+  var btn = document.getElementById('reveal-phone-btn');
+  if (btn) {
+    btn.addEventListener('click', function () {
+      fetch(btn.dataset.url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          var el = document.getElementById('phone-display');
+          if (res.ok) {
+            el.hidden = false;
+            el.innerHTML = '<a href="tel:' + res.d.phone + '">' + res.d.phone + '</a>';
+            btn.hidden = true;
+          } else {
+            el.hidden = false;
+            el.textContent = res.d.error || 'Unavailable';
+          }
+        });
+    });
+  }
+
+  var shareBtn = document.getElementById('share-listing-btn');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', function () {
+      var url = shareBtn.dataset.url;
+      var title = shareBtn.dataset.title || document.title;
+      if (navigator.share) {
+        navigator.share({ title: title, url: url }).catch(function () {});
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () {
+          shareBtn.textContent = 'Link copied';
+          setTimeout(function () { shareBtn.textContent = 'Share'; }, 2000);
+        });
+      } else {
+        prompt('Copy this link:', url);
+      }
+    });
+  }
+
+  var mapEl = document.getElementById('detail-map');
+  if (mapEl && typeof L !== 'undefined') {
+    var lat = parseFloat(mapEl.dataset.lat);
+    var lng = parseFloat(mapEl.dataset.lng);
+    var mapLang = (mapEl.dataset.lang || document.documentElement.getAttribute('data-map-lang') || 'en').slice(0, 2);
+    var map = L.map(mapEl, { attributionControl: true }).setView([lat, lng], 15);
+    // Localized label bias: OSM-based tiles; geocode uses site language server-side
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: mapLang === 'ar'
+        ? '&copy; OpenStreetMap | خريطة'
+        : '&copy; OpenStreetMap'
+    }).addTo(map);
+    map.getContainer().setAttribute('lang', mapLang);
+    L.marker([lat, lng]).addTo(map);
+    setTimeout(function () { map.invalidateSize(); }, 100);
+  }
+})();
+</script>
+{% endblock %}

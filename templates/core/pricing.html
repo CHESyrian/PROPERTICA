@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Pricing" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<section class="pricing-page">
+  <header class="pricing-hero">
+    <p class="pricing-kicker">{% trans "Plans" %}</p>
+    <h1>{% trans "Simple pricing for every seller" %}</h1>
+    <p class="lead">
+      {% trans "Start free. Upgrade when you need more listings and featured placement. Billing will unlock without changing your data." %}
+    </p>
+  </header>
+
+  <div class="pricing-grid">
+    {% for plan in plans %}
+      <article class="pricing-card {% if plan.code == 'starter' %}pricing-card-featured{% endif %} {% if plan.code == 'free' %}is-current{% endif %}">
+        {% if plan.code == "starter" %}
+          <span class="pricing-ribbon">{% trans "Most popular" %}</span>
+        {% endif %}
+        <div class="pricing-card-head">
+          <h2>{{ plan.label }}</h2>
+          <p class="pricing-code">{{ plan.code }}</p>
+          {% if plan.code == "free" %}
+            <p class="pricing-price"><span class="amount">0</span> <span class="period">{% trans "forever" %}</span></p>
+          {% else %}
+            <p class="pricing-price"><span class="amount">{% trans "Paid" %}</span> <span class="period">{% trans "when billing goes live" %}</span></p>
+          {% endif %}
+        </div>
+        <ul class="pricing-features">
+          {% for e in plan.entitlements.all %}
+            <li>
+              {% if e.entitlement_key == "max_active_listings" %}
+                <strong>{{ e.entitlement_value }}</strong> {% trans "active listings" %}
+              {% elif e.entitlement_key == "can_feature_listing" %}
+                {% if e.entitlement_value == "true" or e.entitlement_value == "1" or e.entitlement_value == True %}
+                  {% trans "Featured listing placement" %}
+                {% else %}
+                  {% trans "No featured placement" %}
+                {% endif %}
+              {% else %}
+                <code>{{ e.entitlement_key }}</code>: {{ e.entitlement_value }}
+              {% endif %}
+            </li>
+          {% empty %}
+            <li class="muted">{% trans "No entitlements listed" %}</li>
+          {% endfor %}
+          {% if plan.code == "free" %}
+            <li>{% trans "Core search & messaging" %}</li>
+            <li>{% trans "Email verification & profile" %}</li>
+          {% else %}
+            <li>{% trans "Everything in Free" %}</li>
+            <li>{% trans "Priority support (planned)" %}</li>
+          {% endif %}
+        </ul>
+        <div class="pricing-card-foot">
+          {% if plan.code == "free" %}
+            <span class="pricing-badge">{% trans "Current default" %}</span>
+          {% else %}
+            <button type="button" class="btn btn-primary btn-block" disabled title="{% trans 'Billing integration coming soon' %}">
+              {% trans "Upgrade — coming soon" %}
+            </button>
+          {% endif %}
+        </div>
+      </article>
+    {% empty %}
+      <p class="muted">{% trans "No plans configured. Run" %} <code>seed_data</code>.</p>
+    {% endfor %}
+  </div>
+
+  <p class="pricing-footnote muted">
+    {% trans "v1 is free for everyone. Paid plans are modeled and ready to activate when payment providers are connected." %}
+  </p>
+</section>
+{% endblock %}

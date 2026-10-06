@@ -1,0 +1,719 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}Post a listing — {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endblock %}
+
+{% block content %}
+{# Attr map outside HTML attributes — avoids broken x-data from JSON quotes #}
+<script type="application/json" id="wizard-attr-map">{{ attr_map_json|safe }}</script>
+
+<div class="wizard"
+     x-data="listingWizard({{ initial_step|default:1 }})"
+     x-init="{% if form.category.value %}categoryId='{{ form.category.value }}'; onCategoryChange();{% endif %} $nextTick(() => { if (step === 3) initMap(); })">
+
+  <h1>Post a listing</h1>
+
+  {# ── Step indicator ── #}
+  <nav class="step-indicator" aria-label="Progress">
+    {% for s in steps %}
+      <button type="button"
+              class="step-dot"
+              :class="{ 'active': step === {{ s.num }}, 'done': step > {{ s.num }} }"
+              @click.prevent="typeof goTo === 'function' && goTo({{ s.num }})"
+              :aria-current="step === {{ s.num }} ? 'step' : null">
+        <span class="step-num">{{ s.num }}</span>
+        <span class="step-label">{{ s.label }}</span>
+      </button>
+      {% if not forloop.last %}<span class="step-line" :class="{ 'done': step > {{ s.num }} }"></span>{% endif %}
+    {% endfor %}
+  </nav>
+
+  {% if form.errors %}
+    <div class="form-errors">
+      <p>Please correct the errors below.</p>
+      <ul>
+        {% for field, errors in form.errors.items %}
+          {% for e in errors %}<li>{{ field }}: {{ e }}</li>{% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="wizard-form" @submit="onSubmit">
+    {% csrf_token %}
+    <input type="hidden" name="action" x-model="action">
+    <input type="hidden" name="cover_index" x-model="coverIndex">
+
+    {# ═══════════════ STEP 1 — Category ═══════════════ #}
+    <section class="wizard-step" x-show="step === 1" x-cloak style="display:block">
+      <h2>What type of property are you listing?</h2>
+      <div class="category-tiles-select">
+        {% for cat in categories %}
+          <label class="tile-select"
+                 :class="{ 'selected': categoryId === '{{ cat.id }}' }">
+            <input type="radio" name="category" value="{{ cat.id }}"
+                   x-model="categoryId"
+                   @change="onCategoryChange()"
+                   {% if form.category.value|stringformat:"s" == cat.id|stringformat:"s" %}checked{% endif %}>
+            <span class="tile-select-body">
+              <span class="tile-select-label">{{ cat.label }}</span>
+              <span class="tile-select-group">{{ cat.get_parent_group_display }}</span>
+            </span>
+          </label>
+        {% empty %}
+          <p class="field-error">No property types found. Run <code>python manage.py seed_data</code>.</p>
+        {% endfor %}
+      </div>
+      {% if form.category.errors %}<p class="field-error">{{ form.category.errors.0 }}</p>{% endif %}
+      <div class="wizard-nav">
+        <span></span>
+        <button type="button" class="btn btn-primary" @click="next()" :disabled="!categoryId">Continue</button>
+      </div>
+    </section>
+
+    {# ═══════════════ STEP 2 — Basics ═══════════════ #}
+    <section class="wizard-step" x-show="step === 2" x-cloak style="display:none">
+      <h2>Basic details</h2>
+      <div class="form-grid">
+        <label class="full">Title *
+          <input type="text" name="title" x-model="title" required maxlength="200"
+                 value="{{ form.title.value|default:'' }}"
+                 placeholder="e.g. Modern 3BR house with garden">
+          {% if form.title.errors %}<span class="field-error">{{ form.title.errors.0 }}</span>{% endif %}
+        </label>
+        <label class="full">Description
+          <textarea name="description" rows="5" x-model="description"
+                    placeholder="Describe the property, neighbourhood, key features…">{{ form.description.value|default:'' }}</textarea>
+        </label>
+        <label>Price *
+          <input type="number" name="price" x-model="price" required min="0.01" step="0.01"
+                 value="{{ form.price.value|default:'' }}">
+          {% if form.price.errors %}<span class="field-error">{{ form.price.errors.0 }}</span>{% endif %}
+        </label>
+        <label>Currency
+          <select name="currency" x-model="currency">
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+            <option value="CHF">CHF</option>
+          </select>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="negotiable" x-model="negotiable" value="true">
+          Price is negotiable
+        </label>
+      </div>
+      <div class="wizard-nav">
+        <button type="button" class="btn" @click="prev()">Back</button>
+        <button type="button" class="btn btn-primary" @click="next()" :disabled="!title || !price">Continue</button>
+      </div>
+    </section>
+
+    {# ═══════════════ STEP 3 — Location ═══════════════ #}
+    <section class="wizard-step" x-show="step === 3" x-cloak style="display:none"
+             x-effect="if (step === 3) { $nextTick(() => initMap()) }">
+      <h2>Where is the property?</h2>
+      <p class="hint">Fill in the address, then place the pin on the map (search or click/drag).</p>
+
+      <div class="form-grid">
+        <label class="full">Address line
+          <input type="text" name="address_line" x-model="addressLine"
+                 value="{{ form.address_line.value|default:'' }}"
+                 placeholder="Street, building, floor…">
+        </label>
+        <label>City *
+          <input type="text" name="city" x-model="city" required
+                 value="{{ form.city.value|default:'' }}">
+          {% if form.city.errors %}<span class="field-error">{{ form.city.errors.0 }}</span>{% endif %}
+        </label>
+        <label>Region / governorate
+          <input type="text" name="region" x-model="region"
+                 value="{{ form.region.value|default:'' }}">
+        </label>
+        <label>Country
+          <input type="text" name="country" x-model="country"
+                 value="{{ form.country.value|default:'Syria' }}">
+        </label>
+        <label>Latitude
+          <input type="number" name="latitude" x-model="latitude" step="0.000001"
+                 value="{{ form.latitude.value|default:'' }}" placeholder="33.5138"
+                 @change="syncMarkerFromInputs()">
+        </label>
+        <label>Longitude
+          <input type="number" name="longitude" x-model="longitude" step="0.000001"
+                 value="{{ form.longitude.value|default:'' }}" placeholder="36.2765"
+                 @change="syncMarkerFromInputs()">
+        </label>
+      </div>
+
+      <div class="geocode-bar" style="margin-top:1rem">
+        <input type="search" class="geocode-input" x-model="geocodeQuery"
+               placeholder="Search place or address…"
+               @keydown.enter.prevent="runGeocode()">
+        <button type="button" class="btn" @click="runGeocode()" :disabled="geocodeLoading">
+          <span x-show="!geocodeLoading">Find on map</span>
+          <span x-show="geocodeLoading" x-cloak>Searching…</span>
+        </button>
+      </div>
+      <div class="geocode-results" x-show="geocodeResults.length" x-cloak>
+        <template x-for="(r, i) in geocodeResults" :key="i">
+          <button type="button" class="geocode-result" @click="pickGeocode(r)" x-text="r.display_name || r.label"></button>
+        </template>
+      </div>
+      <p class="field-error" x-show="geocodeError" x-text="geocodeError" x-cloak></p>
+
+      <div id="listing-map" class="listing-map" x-ref="mapEl"></div>
+      <p class="hint map-hint">Drag the pin to fine-tune. Click the map to move the pin.</p>
+      <p class="hint map-api-note">Map tiles &amp; geocoding use free public services (Carto + Photon). For production map providers (Google, Mapbox, etc.) an <strong>API key</strong> is required.</p>
+
+      <div class="wizard-nav">
+        <button type="button" class="btn" @click="prev()">Back</button>
+        <button type="button" class="btn btn-primary" @click="next()" :disabled="!city">Continue</button>
+      </div>
+    </section>
+
+{# ═══════════════ STEP 4 — Type-specific details ═══════════════ #}
+    <section class="wizard-step" x-show="step === 4" x-cloak style="display:none">
+      <h2>Property details</h2>
+      <p class="hint" x-show="!attrs.length">Select a property type first (step 1).</p>
+      <div class="form-grid" x-show="attrs.length">
+        <label>Area (m²)
+          <input type="number" name="area_value" x-model="areaValue" step="0.01" min="0"
+                 value="{{ form.area_value.value|default:'' }}">
+        </label>
+        <template x-for="attr in attrs" :key="attr.key">
+          <label>
+            <span x-text="attr.label + (attr.is_required ? ' *' : '')"></span>
+            <template x-if="attr.data_type === 'number'">
+              <input type="number" :name="'attr_' + attr.key" x-model="attrValues[attr.key]"
+                     step="any" :required="attr.is_required">
+            </template>
+            <template x-if="attr.data_type === 'boolean'">
+              <span class="checkbox-label">
+                <input type="checkbox" :name="'attr_' + attr.key" x-model="attrValues[attr.key]" value="true">
+                Yes
+              </span>
+            </template>
+            <template x-if="attr.data_type === 'enum'">
+              <select :name="'attr_' + attr.key" x-model="attrValues[attr.key]" :required="attr.is_required">
+                <option value="">—</option>
+                <template x-for="opt in attr.enum_options" :key="opt">
+                  <option :value="opt" x-text="opt.replaceAll('_', ' ')"></option>
+                </template>
+              </select>
+            </template>
+            <template x-if="attr.data_type === 'string'">
+              <input type="text" :name="'attr_' + attr.key" x-model="attrValues[attr.key]"
+                     :required="attr.is_required">
+            </template>
+          </label>
+        </template>
+      </div>
+      <div class="wizard-nav">
+        <button type="button" class="btn" @click="prev()">Back</button>
+        <button type="button" class="btn btn-primary" @click="next()">Continue</button>
+      </div>
+    </section>
+
+    {# ═══════════════ STEP 5 — Photos ═══════════════ #}
+    <section class="wizard-step" x-show="step === 5" x-cloak style="display:none">
+      <h2>Photos</h2>
+      <p class="hint">
+        Upload at least one photo to publish. Drag cards to reorder, or use the arrows.
+        The cover photo is shown first in search results.
+      </p>
+
+      <div class="photo-upload-zone"
+           @dragover.prevent="uploadDragOver = true"
+           @dragleave.prevent="uploadDragOver = false"
+           @drop.prevent="onDrop($event)"
+           :class="{ 'drag-over': uploadDragOver }">
+        <input type="file" accept="image/*" multiple
+               @change="onFileSelect($event)" id="photo-input" class="sr-only">
+        <label for="photo-input" class="upload-label">
+          <span class="upload-icon">📷</span>
+          <span>Click or drop images here</span>
+          <span class="hint">JPG, PNG, WebP · up to ~10 MB each · multiple allowed</span>
+        </label>
+      </div>
+
+      <p class="photo-count muted" x-show="previews.length"
+         x-text="previews.length + ' photo' + (previews.length === 1 ? '' : 's') +
+                 (coverIndex === 0 ? ' · first is cover' : '')"></p>
+
+      <div class="photo-preview-grid" x-show="previews.length"
+           @dragover.prevent="onReorderDragOver($event)">
+        <template x-for="(p, i) in previews" :key="p.id">
+          <div class="photo-preview"
+               :class="{
+                 'is-cover': coverIndex === i,
+                 'is-dragging': dragFrom === i,
+                 'drag-over-target': dragOverIndex === i && dragFrom !== i
+               }"
+               draggable="true"
+               @dragstart="onReorderStart($event, i)"
+               @dragend="onReorderEnd()"
+               @dragenter.prevent="dragOverIndex = i"
+               @drop.prevent="onReorderDrop(i)">
+            <div class="photo-preview-img-wrap">
+              <img :src="p.url" :alt="'Photo ' + (i+1)" draggable="false">
+              <span class="cover-badge" x-show="coverIndex === i">Cover</span>
+              <span class="photo-order-badge" x-text="i + 1"></span>
+            </div>
+            <div class="photo-actions">
+              <button type="button" class="btn btn-sm photo-move"
+                      @click="movePhoto(i, i - 1)"
+                      :disabled="i === 0"
+                      title="Move left" aria-label="Move left">‹</button>
+              <button type="button" class="btn btn-sm photo-move"
+                      @click="movePhoto(i, i + 1)"
+                      :disabled="i === previews.length - 1"
+                      title="Move right" aria-label="Move right">›</button>
+              <button type="button" class="btn btn-sm"
+                      @click="setCover(i)"
+                      x-show="coverIndex !== i">Set cover</button>
+              <button type="button" class="btn btn-sm btn-danger"
+                      @click="removePhoto(i)" aria-label="Remove photo">Remove</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <p class="field-error" x-show="photoError" x-text="photoError" x-cloak></p>
+
+      {# Files submitted in current order via DataTransfer #}
+      <input type="file" name="photos" accept="image/*" multiple x-ref="fileInput" class="sr-only">
+
+      <div class="wizard-nav">
+        <button type="button" class="btn" @click="prev()">Back</button>
+        <button type="button" class="btn btn-primary" @click="nextFromPhotos()">Continue</button>
+      </div>
+    </section>
+
+    {# ═══════════════ STEP 6 — Review ═══════════════ #}
+    <section class="wizard-step" x-show="step === 6" x-cloak style="display:none">
+      <h2>Review & publish</h2>
+      <div class="review-card">
+        <dl class="review-dl">
+          <dt>Type</dt>
+          <dd x-text="categoryLabel"></dd>
+          <dt>Title</dt>
+          <dd x-text="title"></dd>
+          <dt>Price</dt>
+          <dd>
+            <span x-text="currency + ' ' + (price || '—')"></span>
+            <span x-show="negotiable" class="badge">Negotiable</span>
+          </dd>
+          <dt>Location</dt>
+          <dd>
+            <span x-text="[addressLine, city, region, country].filter(Boolean).join(', ') || '—'"></span>
+          </dd>
+          <dt>Area</dt>
+          <dd x-text="areaValue ? areaValue + ' m²' : '—'"></dd>
+          <dt>Photos</dt>
+          <dd>
+            <span x-text="previews.length + ' photo(s)'"></span>
+            <span class="muted" x-show="previews.length === 0"> — required to publish</span>
+            <div class="review-photo-strip" x-show="previews.length">
+              <template x-for="(p, i) in previews" :key="p.id">
+                <div class="review-photo-thumb" :class="{ 'is-cover': coverIndex === i }">
+                  <img :src="p.url" :alt="'Photo ' + (i+1)">
+                  <span x-show="coverIndex === i" class="cover-badge">Cover</span>
+                </div>
+              </template>
+            </div>
+          </dd>
+        </dl>
+        <div class="review-attrs" x-show="Object.keys(attrValues).length">
+          <h3>Details</h3>
+          <dl class="review-dl">
+            <template x-for="attr in attrs" :key="attr.key">
+              <template x-if="attrValues[attr.key] !== undefined && attrValues[attr.key] !== '' && attrValues[attr.key] !== false">
+                <div class="review-row">
+                  <dt x-text="attr.label"></dt>
+                  <dd x-text="formatAttr(attr)"></dd>
+                </div>
+              </template>
+            </template>
+          </dl>
+        </div>
+      </div>
+
+      <div class="wizard-nav wizard-nav-final">
+        <button type="button" class="btn" @click="prev()">Back</button>
+        <div class="final-actions">
+          <button type="submit" class="btn" @click="action = 'draft'">Save as draft</button>
+          <button type="submit" class="btn btn-primary" @click="action = 'publish'">Publish</button>
+        </div>
+      </div>
+    </section>
+  </form>
+</div>
+
+<script>
+(function () {
+  function loadAttrMap() {
+    try {
+      var el = document.getElementById('wizard-attr-map');
+      if (!el) return {};
+      return JSON.parse(el.textContent || '{}');
+    } catch (e) {
+      console.warn('wizard attr map parse failed', e);
+      return {};
+    }
+  }
+
+  function listingWizardFactory(initialStep) {
+    return {
+    step: Number(initialStep) || 1,
+    categoryId: '',
+    attrMap: loadAttrMap(),
+    attrs: [],
+    attrValues: {},
+    title: '',
+    description: '',
+    price: '',
+    currency: 'EUR',
+    negotiable: false,
+    addressLine: '',
+    city: '',
+    region: '',
+    country: 'Syria',
+    latitude: '',
+    longitude: '',
+    areaValue: '',
+    previews: [],
+    files: [],
+    coverIndex: 0,
+    uploadDragOver: false,
+    dragFrom: null,
+    dragOverIndex: null,
+    photoError: '',
+    _photoIdSeq: 0,
+    action: 'draft',
+
+    // Map / geocode
+    map: null,
+    marker: null,
+    mapReady: false,
+    geocodeQuery: '',
+    geocodeResults: [],
+    geocodeLoading: false,
+    geocodeError: '',
+    defaultCenter: [34.8021, 38.9968], // Syria centroid
+    defaultZoom: 7,
+
+    get categoryLabel() {
+      const tiles = document.querySelectorAll('.tile-select');
+      for (const t of tiles) {
+        const input = t.querySelector('input');
+        if (input && input.value === this.categoryId) {
+          return t.querySelector('.tile-select-label')?.textContent || '';
+        }
+      }
+      return '';
+    },
+
+    onCategoryChange() {
+      this.attrs = this.attrMap[this.categoryId] || [];
+      this.attrValues = {};
+      for (const a of this.attrs) {
+        this.attrValues[a.key] = a.data_type === 'boolean' ? false : '';
+      }
+    },
+
+    goTo(n) {
+      if (n >= 1 && n <= 6) {
+        this.step = n;
+        if (n === 3) this.$nextTick(() => this.initMap());
+      }
+    },
+    next() {
+      if (this.step < 6) {
+        this.step++;
+        if (this.step === 3) {
+          this.$nextTick(() => this.initMap());
+        }
+      }
+    },
+    prev() {
+      if (this.step > 1) this.step--;
+    },
+
+    onFileSelect(e) {
+      const incoming = Array.from(e.target.files || []);
+      this.addFiles(incoming);
+      // Clear so the same file can be re-selected if needed
+      e.target.value = '';
+    },
+    onDrop(e) {
+      this.uploadDragOver = false;
+      // Ignore internal reorder drops that land on the upload zone
+      if (e.dataTransfer.types.includes('application/x-propertica-photo-index')) return;
+      const incoming = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'));
+      this.addFiles(incoming);
+    },
+    addFiles(incoming) {
+      for (const f of incoming) {
+        if (!f.type.startsWith('image/')) continue;
+        this.files.push(f);
+        this._photoIdSeq += 1;
+        this.previews.push({
+          id: 'p' + this._photoIdSeq,
+          url: URL.createObjectURL(f),
+          name: f.name,
+        });
+      }
+      this.photoError = '';
+      this.syncFileInput();
+    },
+    removePhoto(i) {
+      if (i < 0 || i >= this.previews.length) return;
+      URL.revokeObjectURL(this.previews[i].url);
+      this.previews.splice(i, 1);
+      this.files.splice(i, 1);
+      if (this.previews.length === 0) {
+        this.coverIndex = 0;
+      } else if (this.coverIndex === i) {
+        this.coverIndex = 0;
+      } else if (this.coverIndex > i) {
+        this.coverIndex -= 1;
+      }
+      this.syncFileInput();
+    },
+    setCover(i) {
+      // Move selected photo to the front so cover is always sort_order 0
+      if (i <= 0 || i >= this.previews.length) {
+        this.coverIndex = 0;
+        return;
+      }
+      const [preview] = this.previews.splice(i, 1);
+      const [file] = this.files.splice(i, 1);
+      this.previews.unshift(preview);
+      this.files.unshift(file);
+      this.coverIndex = 0;
+      this.syncFileInput();
+    },
+    movePhoto(from, to) {
+      if (to < 0 || to >= this.previews.length || from === to) return;
+      const [preview] = this.previews.splice(from, 1);
+      const [file] = this.files.splice(from, 1);
+      this.previews.splice(to, 0, preview);
+      this.files.splice(to, 0, file);
+      // Keep cover pointing at the same image
+      if (this.coverIndex === from) {
+        this.coverIndex = to;
+      } else if (from < this.coverIndex && to >= this.coverIndex) {
+        this.coverIndex -= 1;
+      } else if (from > this.coverIndex && to <= this.coverIndex) {
+        this.coverIndex += 1;
+      }
+      this.syncFileInput();
+    },
+    onReorderStart(e, i) {
+      this.dragFrom = i;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('application/x-propertica-photo-index', String(i));
+      // Some browsers require text data for drag to work
+      e.dataTransfer.setData('text/plain', String(i));
+    },
+    onReorderDragOver(e) {
+      if (this.dragFrom === null) return;
+      e.dataTransfer.dropEffect = 'move';
+    },
+    onReorderDrop(to) {
+      const from = this.dragFrom;
+      this.dragOverIndex = null;
+      if (from === null || from === to) {
+        this.dragFrom = null;
+        return;
+      }
+      this.movePhoto(from, to);
+      this.dragFrom = null;
+    },
+    onReorderEnd() {
+      this.dragFrom = null;
+      this.dragOverIndex = null;
+    },
+    nextFromPhotos() {
+      this.photoError = '';
+      // Soft guidance only — drafts may have zero photos; publish enforces ≥1 server-side
+      if (this.previews.length === 0) {
+        this.photoError = 'You can continue without photos, but at least one is required to publish.';
+      }
+      this.next();
+    },
+    syncFileInput() {
+      // Rebuild the actual file input so only current files are submitted, in order
+      const dt = new DataTransfer();
+      for (const f of this.files) dt.items.add(f);
+      const input = this.$refs.fileInput;
+      if (input) input.files = dt.files;
+    },
+
+    // ── Map ──────────────────────────────────────────
+    initMap() {
+      if (typeof L === 'undefined') return;
+      const el = this.$refs.mapEl || document.getElementById('listing-map');
+      if (!el) return;
+
+      // Leaflet needs a visible container; if already inited, just invalidate size
+      if (this.map) {
+        setTimeout(() => this.map.invalidateSize(), 50);
+        return;
+      }
+
+      const lat = parseFloat(this.latitude);
+      const lng = parseFloat(this.longitude);
+      const hasCoords = !isNaN(lat) && !isNaN(lng);
+      const center = hasCoords ? [lat, lng] : this.defaultCenter;
+      const zoom = hasCoords ? 15 : this.defaultZoom;
+
+      const mapLang = (document.documentElement.getAttribute('data-map-lang') || 'en').slice(0, 2);
+      this.map = L.map(el).setView(center, zoom);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: mapLang === 'ar'
+          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> | خريطة'
+          : '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      }).addTo(this.map);
+      this.map.getContainer().setAttribute('lang', mapLang);
+
+      this.marker = L.marker(center, { draggable: true }).addTo(this.map);
+      this.marker.on('dragend', () => {
+        const pos = this.marker.getLatLng();
+        this.latitude = pos.lat.toFixed(6);
+        this.longitude = pos.lng.toFixed(6);
+        this.reverseGeocode(pos.lat, pos.lng);
+      });
+
+      this.map.on('click', (e) => {
+        this.marker.setLatLng(e.latlng);
+        this.latitude = e.latlng.lat.toFixed(6);
+        this.longitude = e.latlng.lng.toFixed(6);
+        this.reverseGeocode(e.latlng.lat, e.latlng.lng);
+      });
+
+      this.mapReady = true;
+      setTimeout(() => this.map.invalidateSize(), 100);
+    },
+
+    async reverseGeocode(lat, lng) {
+      try {
+        const mapLang = (document.documentElement.getAttribute('data-map-lang') || 'en').slice(0, 2);
+        const url = '{% url "listings:reverse_geocode" %}?lat=' + encodeURIComponent(lat)
+          + '&lon=' + encodeURIComponent(lng)
+          + '&lang=' + encodeURIComponent(mapLang);
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (!resp.ok) return;
+        if (data.address_line) this.addressLine = data.address_line;
+        if (data.city) this.city = data.city;
+        if (data.region) this.region = data.region;
+        if (data.country) this.country = data.country;
+      } catch (err) { /* silent */ }
+    },
+
+    syncPinFromInputs() {
+      if (!this.map || !this.marker) return;
+      const lat = parseFloat(this.latitude);
+      const lng = parseFloat(this.longitude);
+      if (isNaN(lat) || isNaN(lng)) return;
+      const pos = L.latLng(lat, lng);
+      this.marker.setLatLng(pos);
+      this.map.setView(pos, Math.max(this.map.getZoom(), 14));
+      this.reverseGeocode(lat, lng);
+    },
+    syncMarkerFromInputs() { this.syncPinFromInputs(); },
+    runGeocode() { return this.geocodeSearch(); },
+    pickGeocode(r) { return this.selectGeocodeResult(r); },
+
+    async geocodeSearch() {
+      const q = (this.geocodeQuery || '').trim();
+      if (q.length < 3) return;
+      this.geocodeLoading = true;
+      this.geocodeError = '';
+      this.geocodeResults = [];
+      try {
+        const mapLang = (document.documentElement.getAttribute('data-map-lang') || 'en').slice(0, 2);
+        const url = '{% url "listings:geocode" %}?q=' + encodeURIComponent(q) + '&lang=' + encodeURIComponent(mapLang);
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (!resp.ok) {
+          this.geocodeError = data.error || 'Search failed';
+          return;
+        }
+        this.geocodeResults = data.results || [];
+        if (!this.geocodeResults.length) {
+          this.geocodeError = 'No results found. Try a different query.';
+        }
+      } catch (err) {
+        this.geocodeError = 'Could not reach geocoding service.';
+      } finally {
+        this.geocodeLoading = false;
+      }
+    },
+
+    selectGeocodeResult(r) {
+      this.geocodeResults = [];
+      this.geocodeQuery = r.display_name || '';
+      this.latitude = parseFloat(r.lat).toFixed(6);
+      this.longitude = parseFloat(r.lon).toFixed(6);
+
+      // Fill address fields when empty or always overwrite from result
+      const street = [r.house_number, r.road].filter(Boolean).join(' ');
+      if (street) this.addressLine = street;
+      if (r.city) this.city = r.city;
+      if (r.region) this.region = r.region;
+      if (r.country) this.country = r.country;
+
+      this.$nextTick(() => {
+        this.initMap();
+        this.syncPinFromInputs();
+        if (this.map) this.map.setView([parseFloat(r.lat), parseFloat(r.lon)], 16);
+      });
+    },
+
+    formatAttr(attr) {
+      const v = this.attrValues[attr.key];
+      if (attr.data_type === 'boolean') return v ? 'Yes' : 'No';
+      return v;
+    },
+
+    onSubmit(e) {
+      // Ensure file input is synced before submit
+      this.syncFileInput();
+      // Basic client-side required check for dynamic attrs
+      for (const a of this.attrs) {
+        if (a.is_required) {
+          const v = this.attrValues[a.key];
+          if (v === '' || v === undefined || v === null) {
+            e.preventDefault();
+            this.step = 4;
+            alert('Please fill in required field: ' + a.label);
+            return;
+          }
+        }
+      }
+    },
+  };
+  }
+
+  // Global factory (x-data="listingWizard(...)")
+  window.listingWizard = listingWizardFactory;
+
+  // Alpine 3 preferred registration
+  document.addEventListener('alpine:init', function () {
+    if (window.Alpine && typeof Alpine.data === 'function') {
+      Alpine.data('listingWizard', listingWizardFactory);
+    }
+  });
+})();
+</script>
+{% endblock %}

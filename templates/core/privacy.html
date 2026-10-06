@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Privacy Policy" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<article class="static-page legal"><h1>{% trans "Privacy Policy" %}</h1>
+  <p class="muted">Last updated: September 2026 · Placeholder for legal review</p>
+
+  <h2>1. Who we are</h2>
+  <p>
+    {{ SITE_NAME }} (“we”, “us”) operates this real estate listings marketplace.
+    This policy describes how we collect, use, and protect personal data.
+  </p>
+
+  <h2>2. Data we collect</h2>
+  <ul>
+    <li><strong>Account data</strong> — email, display name, phone (optional), account type, and an auto-generated username.</li>
+    <li><strong>Listing data</strong> — property details, photos, location, and related attributes you publish.</li>
+    <li><strong>Messages</strong> — inquiries and conversation content between buyers and sellers.</li>
+    <li><strong>Usage data</strong> — searches, favorites, and technical logs needed to operate and secure the Service.</li>
+  </ul>
+
+  <h2>3. How we use data</h2>
+  <p>
+    We use personal data to provide the Service (accounts, listings, messaging),
+    improve search and relevance, send transactional notifications (e.g. new
+    inquiries), prevent fraud and abuse, and comply with legal obligations.
+  </p>
+
+  <h2>4. Sharing</h2>
+  <p>
+    Listing content you publish is visible to other users. When a buyer contacts
+    a seller, relevant contact and message data is shared between those parties.
+    We do not sell personal data. We may use processors (hosting, email) under
+    appropriate agreements.
+  </p>
+
+  <h2>5. Retention</h2>
+  <p>
+    We retain account and listing data while your account is active and as needed
+    for legitimate business or legal purposes. You may request account deletion;
+    some records may be retained where required by law.
+  </p>
+
+  <h2>6. Your rights</h2>
+  <p>
+    Depending on your jurisdiction (e.g. GDPR), you may have rights to access,
+    rectify, erase, or port your data, and to object to or restrict certain
+    processing. Contact us to exercise these rights.
+  </p>
+
+  <h2>7. Security</h2>
+  <p>
+    We use industry-standard measures (HTTPS, hashed passwords, access controls)
+    to protect data. No system is perfectly secure; please use a strong password
+    and keep your credentials private.
+  </p>
+
+  <h2>8. Cookies</h2>
+  <p>
+    We use session and preference cookies necessary for authentication and site
+    functionality (e.g. theme). We do not use third-party advertising cookies in v1.
+  </p>
+
+  <h2>9. Contact</h2>
+  <p>
+    Privacy questions: <a href="{% url 'core:contact' %}">Contact us</a>.
+  </p>
+</article>
+{% endblock %}

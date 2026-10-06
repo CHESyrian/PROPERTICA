@@ -1,0 +1,13 @@
+{% load static %}
+{# Reusable brand logo — h: horizontal, v: vertical, mark: icon #}
+{% if size == "sm" %}
+<img src="{% static 'img/propertica-brand-h.png' %}" alt="{{ SITE_NAME }}" class="brand-logo-img brand-logo-sm" width="120" height="60">
+{% elif size == "lg" %}
+<img src="{% static 'img/propertica-brand-h.png' %}" alt="{{ SITE_NAME }}" class="brand-logo-img brand-logo-lg" width="280" height="140">
+{% elif size == "v" %}
+<img src="{% static 'img/propertica-brand-v.png' %}" alt="{{ SITE_NAME }}" class="brand-logo-img brand-logo-v" width="160" height="160">
+{% elif size == "mark" %}
+<img src="{% static 'img/propertica-icon.png' %}" alt="{{ SITE_NAME }}" class="brand-logo-img brand-logo-mark" width="40" height="40">
+{% else %}
+<img src="{% static 'img/propertica-brand-h.png' %}" alt="{{ SITE_NAME }}" class="brand-logo-img" width="180" height="90">
+{% endif %}

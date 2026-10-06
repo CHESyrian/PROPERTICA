@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{{ profile.resolved_display_name }} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}<article class="static-page" style="max-width: 56rem;">
+  <header class="agency-header">
+    <h1>{{ profile.resolved_display_name }}</h1>
+    <p class="muted">
+      <span class="badge">{{ profile.get_account_type_display }}</span>
+      · <code>{{ profile.username }}</code>
+      {% if profile.reputation %}
+      · {{ profile.reputation.points }} pts · Level {{ profile.reputation.level }}
+      {% if profile.reputation.average_rating %}· ★ {{ profile.reputation.average_rating }}{% endif %}
+    {% endif %}
+      {% if profile.agency_id %}
+        · with
+        <a href="{% url 'accounts:agency_public' profile.agency.username %}">
+          {{ profile.agency.resolved_display_name }}
+        </a>
+      {% endif %}
+    </p>
+  </header>
+
+  <section class="dash-section">
+    <h2>Active listings</h2>
+    <div class="card-grid">
+      {% for listing in listings %}
+        {% include "listings/_card.html" with listing=listing %}
+      {% empty %}
+        <p class="muted">No active listings.</p>
+      {% endfor %}
+    </div>
+  </section>
+</article>
+{% endblock %}

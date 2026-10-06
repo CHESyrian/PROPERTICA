@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Edit listing" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}<div class="auth-page">
+  <div class="auth-card auth-card-wide">
+    <h1 class="auth-title">{% trans "Edit listing" %}</h1>
+    <p class="auth-subtitle muted">{{ listing.title }}</p>
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn btn-primary btn-block">Save changes</button>
+      <a href="{% url 'listings:detail' listing.pk %}" class="btn btn-block">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

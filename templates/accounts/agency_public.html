@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{{ agency.resolved_display_name }} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}<article class="static-page" style="max-width: 56rem;">
+  <header class="agency-header">
+    <h1>{{ agency.resolved_display_name }}</h1>
+    <p class="muted">
+      <span class="badge">Agency</span>
+      · <code>{{ agency.username }}</code>
+      {% if agency.email_verified_at %}· Verified email{% endif %}
+      {% if agency.reputation %}· {{ agency.reputation.points }} pts · Level {{ agency.reputation.level }}{% endif %}
+    </p>
+  </header>
+
+  {% if agents %}
+    <section class="dash-section">
+      <h2>Agents</h2>
+      <ul class="invite-list">
+        {% for link in agents %}
+          <li class="invite-item">
+            <div>
+              <strong>{{ link.agent.resolved_display_name }}</strong>
+              <span class="muted">· <code>{{ link.agent.username }}</code></span>
+            </div>
+            <a class="btn btn-sm" href="{% url 'accounts:public_profile' link.agent.username %}">Profile</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <section class="dash-section">
+    <h2>Listings from this agency</h2>
+    <div class="card-grid">
+      {% for listing in listings %}
+        {% include "listings/_card.html" with listing=listing %}
+      {% empty %}
+        <p class="muted">No active agency-owned listings.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if agent_listings %}
+    <section class="dash-section">
+      <h2>Listings from agents</h2>
+      <div class="card-grid">
+        {% for listing in agent_listings %}
+          {% include "listings/_card.html" with listing=listing %}
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+</article>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}Conversation — {{ thread.listing.title }} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}<div class="thread-view">
+  <div class="thread-header">
+    <a href="{% url 'messaging:inbox' %}" class="back-link">← Inbox</a>
+    <h1>{{ thread.listing.title }}</h1>
+    <p class="muted">
+      {% if is_buyer %}
+        Conversation with {{ other_party.resolved_display_name }}
+        ({{ other_party.get_account_type_display }})
+      {% else %}
+        Inquiry from {{ other_party.resolved_display_name }}
+      {% endif %}
+      · <a href="{% url 'listings:detail' thread.listing.pk %}">View listing</a>
+    </p>
+  </div>
+
+  <div class="message-feed" id="message-feed">
+    {% for msg in thread_messages %}
+      <div class="message-bubble {% if msg.sender_id == user.id %}mine{% else %}theirs{% endif %}">
+        <div class="message-meta">
+          <strong>
+            {% if msg.sender_id == user.id %}You{% else %}{{ msg.sender.resolved_display_name }}{% endif %}
+          </strong>
+          <time datetime="{{ msg.created_at|date:'c' }}">{{ msg.created_at|date:"M j, Y H:i" }}</time>
+        </div>
+        <div class="message-body">{{ msg.body|linebreaksbr }}</div>
+      </div>
+    {% empty %}
+      <p class="muted">No messages in this thread yet.</p>
+    {% endfor %}
+  </div>
+
+  <form method="post" class="reply-form">
+    {% csrf_token %}
+    {{ form.body }}
+    {% if form.body.errors %}<p class="field-error">{{ form.body.errors.0 }}</p>{% endif %}
+    <button type="submit" class="btn btn-primary">Send reply</button>
+  </form>
+</div>
+
+<script>
+  // Scroll to bottom of feed
+  (function () {
+    var feed = document.getElementById('message-feed');
+    if (feed) feed.scrollTop = feed.scrollHeight;
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Profile" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card auth-card-wide">
+    <h1 class="auth-title">{% trans "Profile" %}</h1>
+    <p class="auth-subtitle muted">
+      <code>{{ user.username }}</code> · {{ user.get_account_type_display }} · {{ user.email }}
+      {% if user.email_verified_at %}
+        · <span class="badge status-active">{% trans "Email verified" %}</span>
+      {% else %}
+        · <span class="badge status-draft">{% trans "Email not verified" %}</span>
+      {% endif %}
+    </p>
+
+    {# ── Email verification code ── #}
+    {% if not user.email_verified_at %}
+    <div class="verify-chooser">
+      <h2 class="verify-heading">{% trans "Verify your email" %}</h2>
+      <p class="muted verify-lead">
+        {% trans "Enter the 8-character code we emailed you (example: 4hj8-ff8b)." %}
+      </p>
+      <form method="post" action="{% url 'accounts:verify_email_qs' %}" class="verify-code-form">
+        {% csrf_token %}
+        <label>
+          {% trans "Verification code" %}
+          <input type="text" name="code" maxlength="12" autocomplete="one-time-code"
+                 placeholder="xxxx-xxxx" pattern="[A-Za-z0-9\-]{8,12}" required
+                 style="letter-spacing:0.08em;font-family:ui-monospace,monospace;text-transform:lowercase">
+        </label>
+        <button type="submit" class="btn btn-primary btn-sm">{% trans "Verify email" %}</button>
+      </form>
+      <form method="post" action="{% url 'accounts:resend_verification' %}" style="margin-top:0.75rem">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm">
+          {% trans "Resend code" %} to {{ user.email }}
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    {# ── Profile form (including phone) ── #}
+    <form method="post" class="auth-form" style="margin-top:1rem">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <label>
+        {% trans "Display name" %}
+        {{ form.display_name }}
+        {% if form.display_name.help_text %}<span class="hint">{{ form.display_name.help_text }}</span>{% endif %}
+        {% if form.display_name.errors %}<span class="field-error">{{ form.display_name.errors.0 }}</span>{% endif %}
+      </label>
+      <label>
+        {% trans "Phone" %}
+        {{ form.phone }}
+        <span class="hint">
+          {% trans "Optional. After you save a phone number, you can verify it below." %}
+        </span>
+        {% if form.phone.errors %}<span class="field-error">{{ form.phone.errors.0 }}</span>{% endif %}
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">{% trans "Save profile" %}</button>
+      <a href="{% url 'accounts:dashboard' %}" class="btn btn-block">{% trans "Dashboard" %}</a>
+    </form>
+
+    {# ── Phone verification only after a phone number exists ── #}
+    {% if user.phone %}
+    <div class="phone-verify-box" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+      <h2 class="verify-heading">{% trans "Phone verification" %}</h2>
+      {% if user.phone_verified_at %}
+        <p class="muted">
+          {% trans "Phone" %} <strong>{{ user.phone }}</strong>
+          <span class="badge status-active">{% trans "Verified" %}</span>
+        </p>
+      {% else %}
+        <p class="muted">
+          {% trans "Your phone" %} <strong>{{ user.phone }}</strong>
+          {% trans "is not verified yet. Send a code to confirm it." %}
+        </p>
+        <form method="post" action="/accounts/phone/request-code/" class="auth-form" style="margin-bottom:.75rem">
+          {% csrf_token %}
+          <input type="hidden" name="phone" value="{{ user.phone }}">
+          <button type="submit" class="btn btn-sm">{% trans "Send verification code" %}</button>
+        </form>
+        <form method="post" action="/accounts/phone/confirm/" class="auth-form">
+          {% csrf_token %}
+          <label>
+            {% trans "Code" %}
+            <input type="text" name="code" inputmode="numeric" maxlength="6"
+                   placeholder="000000" autocomplete="one-time-code">
+          </label>
+          <button type="submit" class="btn btn-sm btn-primary">{% trans "Confirm phone" %}</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── Privacy ── #}
+    <div class="privacy-box" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+      <h2 style="font-size:1rem;margin:0 0 .5rem">{% trans "Privacy & data" %}</h2>
+      <p class="muted">{% trans "Download a copy of your data or permanently delete your account." %}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+        <a class="btn btn-sm" href="{% url 'accounts:data_export' %}">{% trans "Download my data (JSON)" %}</a>
+      </div>
+      <form method="post" action="{% url 'accounts:account_delete' %}" style="margin-top:1rem"
+            onsubmit="return confirm('This permanently deactivates your account. Continue?');">
+        {% csrf_token %}
+        <label>{% trans "Type" %} <strong>delete</strong> {% trans "to confirm" %}
+          <input type="text" name="confirm" placeholder="delete" autocomplete="off">
+        </label>
+        <button type="submit" class="btn-delete-account">{% trans "Delete account" %}</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

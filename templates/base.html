@@ -1,0 +1,348 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ CURRENT_LANGUAGE|default:'ar' }}"
+      dir="{% if IS_RTL %}rtl{% else %}ltr{% endif %}"
+      data-theme="light"
+      data-map-lang="{{ CURRENT_LANGUAGE|default:'en'|slice:':2' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'img/propertica-icon.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/propertica-icon.png' %}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  {% block extra_head %}{% endblock %}
+  <script>
+    /* Apply theme before paint to avoid flash */
+    (function () {
+      try {
+        var t = localStorage.getItem('propertica-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body x-data="appShell()">
+  <header class="site-header">
+    <div class="container header-inner">
+      {# Brand #}
+      <a href="{% url 'core:home' %}" class="brand" aria-label="{{ SITE_NAME }}">
+        <img src="{% static 'img/propertica-brand-h.png' %}" alt="{{ SITE_NAME }}" class="brand-logo" width="180" height="90">
+        <img src="{% static 'img/propertica-icon.png' %}" alt="{{ SITE_NAME }}" class="brand-mark" width="40" height="40">
+      </a>
+
+      {# Search — icon inside field #}
+      <form action="{% url 'listings:search' %}" method="get" class="header-search" role="search">
+        <div class="header-search-field">
+          <input type="search" name="q"
+                 placeholder="{% trans 'City, neighbourhood…' %}"
+                 value="{{ request.GET.q }}"
+                 aria-label="{% trans 'Search' %}">
+          <button type="submit" class="header-search-icon" aria-label="{% trans 'Search' %}">
+            <i class="bi bi-search" aria-hidden="true"></i>
+          </button>
+        </div>
+      </form>
+
+      <div class="header-actions">
+        <a href="{% url 'listings:search' %}" class="btn btn-ghost">{% trans "Buy" %}</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'listings:create' %}" class="btn btn-primary">{% trans "Post a listing" %}</a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}" class="btn btn-ghost">{% trans "Log in" %}</a>
+          <a href="{% url 'accounts:register' %}" class="btn btn-primary">{% trans "Register" %}</a>
+        {% endif %}
+
+        {# Profile / settings menu #}
+        <div class="user-menu" @click.outside="menuOpen = false">
+          <button type="button"
+                  class="avatar-btn"
+                  @click="menuOpen = !menuOpen"
+                  :aria-expanded="menuOpen.toString()"
+                  aria-haspopup="true"
+                  aria-label="{% trans 'Settings' %}">
+            {% if user.is_authenticated %}
+              {{ user.resolved_display_name|default:user.username|slice:":1"|upper }}
+            {% else %}
+              {# Settings gear when guest #}
+              <i class="bi bi-gear" aria-hidden="true"></i>
+            {% endif %}
+          </button>
+
+          <div class="dropdown" x-show="menuOpen" x-cloak x-transition>
+            {% if user.is_authenticated %}
+              <div class="dropdown-header">
+                <div class="name">{{ user.resolved_display_name }}</div>
+                <div class="meta">{{ user.email }}</div>
+              </div>
+              <a href="{% url 'accounts:profile' %}" class="dropdown-item">
+                <i class="bi bi-person" aria-hidden="true"></i>
+                <span class="item-label">{% trans "Profile" %}</span>
+              </a>
+              <a href="{% url 'accounts:dashboard' %}" class="dropdown-item">
+                <i class="bi bi-grid-1x2" aria-hidden="true"></i>
+                <span class="item-label">{% trans "Dashboard" %}</span>
+              </a>
+              <a href="{% url 'messaging:inbox' %}" class="dropdown-item">
+                <i class="bi bi-chat-left-text" aria-hidden="true"></i>
+                <span class="item-label">{% trans "Messages" %}</span>
+              </a>
+              <a href="{% url 'listings:favorites' %}" class="dropdown-item">
+                <i class="bi bi-heart" aria-hidden="true"></i>
+                <span class="item-label">{% trans "Favorites" %}</span>
+              </a>
+              <a href="{% url 'messaging:notifications' %}" class="dropdown-item">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+                <span class="item-label">
+                  {% trans "Notifications" %}
+                  {% if unread_notification_count %}
+                    <span class="nav-badge">{{ unread_notification_count }}</span>
+                  {% endif %}
+                </span>
+              </a>
+              <div class="dropdown-divider"></div>
+            {% endif %}
+
+            {# Theme toggle #}
+            <button type="button" class="dropdown-item" @click="toggleTheme()">
+              <template x-if="theme === 'light'">
+                <i class="bi bi-moon" aria-hidden="true"></i>
+              </template>
+              <template x-if="theme === 'dark'">
+                <i class="bi bi-sun" aria-hidden="true"></i>
+              </template>
+              <span class="item-label" x-text="theme === 'light' ? '{% trans "Dark" %}' : '{% trans "Light" %}'"></span>
+            </button>
+
+            {# Language toggle #}
+            <div class="dropdown-item" style="cursor:default">
+              <i class="bi bi-globe" aria-hidden="true"></i>
+              <span class="item-label">{% trans "Language" %}</span>
+              <div class="lang-flags">
+                <form action="{% url 'set_language' %}" method="post" style="display:inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <input type="hidden" name="language" value="en">
+                  <button type="submit" class="lang-btn {% if CURRENT_LANGUAGE == 'en' %}active{% endif %}" title="English">
+                    <span class="flag" aria-hidden="true">🇺🇸</span> EN
+                  </button>
+                </form>
+                <form action="{% url 'set_language' %}" method="post" style="display:inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <input type="hidden" name="language" value="ar">
+                  <button type="submit" class="lang-btn {% if CURRENT_LANGUAGE == 'ar' %}active{% endif %}" title="العربية">
+                    <span class="flag" aria-hidden="true">🇸🇾</span> AR
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {% if user.is_authenticated %}
+              <div class="dropdown-divider"></div>
+              <form action="{% url 'accounts:logout' %}" method="post" class="logout-form">
+                {% csrf_token %}
+                <button type="submit" class="dropdown-item danger">
+                  <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                  <span class="item-label">{% trans "Log out" %}</span>
+                </button>
+              </form>
+            {% else %}
+              <div class="dropdown-divider"></div>
+              <a href="{% url 'accounts:login' %}" class="dropdown-item">
+                <span class="item-label">{% trans "Log in" %}</span>
+              </a>
+              <a href="{% url 'accounts:register' %}" class="dropdown-item">
+                <span class="item-label">{% trans "Register" %}</span>
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    {% if messages %}
+      <ul class="messages" x-data>
+        {% for message in messages %}
+          <li class="toast toast-{{ message.tags|default:'info' }}"
+              x-data="{ show: true }"
+              x-show="show"
+              x-transition
+              role="status">
+            <span class="toast-text">{{ message }}</span>
+            <button type="button"
+                    class="toast-dismiss"
+                    @click="show = false"
+                    aria-label="{% trans 'Dismiss' %}">&times;</button>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <a href="{% url 'core:home' %}" class="footer-brand" aria-label="{{ SITE_NAME }}">
+        <img src="{% static 'img/propertica-brand-h.png' %}" alt="{{ SITE_NAME }}" class="footer-logo" width="140" height="70">
+      </a>
+      <p>
+        &copy; {% now "Y" %} {{ SITE_NAME }}
+        · <a href="{% url 'core:pricing' %}">{% trans "Pricing" %}</a>
+        · <a href="{% url 'core:about' %}">{% trans "About" %}</a>
+        · <a href="{% url 'core:terms' %}">{% trans "Terms" %}</a>
+        · <a href="{% url 'core:privacy' %}">{% trans "Privacy" %}</a>
+        · <a href="{% url 'core:contact' %}">{% trans "Contact" %}</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    function appShell() {
+      return {
+        menuOpen: false,
+        theme: (function () {
+          try { return localStorage.getItem('propertica-theme') || 'light'; }
+          catch (e) { return 'light'; }
+        })(),
+        toggleTheme() {
+          this.theme = this.theme === 'light' ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', this.theme);
+          try { localStorage.setItem('propertica-theme', this.theme); } catch (e) {}
+        },
+      };
+    }
+
+    /* Number inputs: allow only digits / decimal / minus; add styled spinners */
+    (function enhanceNumberInputs() {
+      function wrap(input) {
+        if (input.dataset.numberEnhanced === '1') return;
+        if (input.closest('.number-field')) {
+          input.dataset.numberEnhanced = '1';
+          return;
+        }
+        var wrap = document.createElement('div');
+        wrap.className = 'number-field';
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        var spins = document.createElement('div');
+        spins.className = 'number-spinners';
+        spins.innerHTML =
+          '<button type="button" tabindex="-1" data-dir="1" aria-label="Increase">▲</button>' +
+          '<button type="button" tabindex="-1" data-dir="-1" aria-label="Decrease">▼</button>';
+        wrap.appendChild(spins);
+
+        spins.addEventListener('click', function (e) {
+          var btn = e.target.closest('button');
+          if (!btn) return;
+          e.preventDefault();
+          var step = parseFloat(input.step) || 1;
+          var min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+          var max = input.max !== '' ? parseFloat(input.max) : Infinity;
+          var val = parseFloat(input.value);
+          if (isNaN(val)) val = 0;
+          val = val + (btn.dataset.dir === '1' ? step : -step);
+          if (val < min) val = min;
+          if (val > max) val = max;
+          // Respect step decimals
+          var decimals = (String(input.step).split('.')[1] || '').length;
+          input.value = decimals ? val.toFixed(decimals) : String(val);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        input.addEventListener('keydown', function (e) {
+          // Allow: backspace, delete, tab, escape, enter, arrows, home/end
+          if ([8, 9, 13, 27, 46, 35, 36, 37, 38, 39, 40].indexOf(e.keyCode) !== -1) return;
+          // Allow Ctrl/Cmd+A/C/V/X
+          if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].indexOf(e.keyCode) !== -1) return;
+          // Allow decimal point and minus
+          if (e.key === '.' || e.key === ',' || e.key === '-') return;
+          // Block non-numeric
+          if (!/^[0-9]$/.test(e.key)) {
+            e.preventDefault();
+          }
+        });
+        input.addEventListener('input', function () {
+          // Strip any non-numeric leftover (paste)
+          var cleaned = input.value.replace(/[^0-9.\-]/g, '');
+          // Keep only first decimal and leading minus
+          cleaned = cleaned.replace(/(?!^)-/g, '').replace(/(\..*)\./g, '$1');
+          if (cleaned !== input.value) input.value = cleaned;
+        });
+        input.dataset.numberEnhanced = '1';
+      }
+
+      function scan(root) {
+        (root || document).querySelectorAll('input[type="number"]').forEach(wrap);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { scan(); });
+      } else {
+        scan();
+      }
+      // Re-scan after Alpine/htmx updates
+      document.addEventListener('alpine:initialized', function () { scan(); });
+      document.body && document.body.addEventListener('htmx:afterSwap', function (e) { scan(e.target); });
+    })();
+
+    /* Favorite toggle — AJAX, no full page reload */
+    (function favAjax() {
+      function csrfToken() {
+        var m = document.cookie.match(/csrftoken=([^;]+)/);
+        if (m) return decodeURIComponent(m[1]);
+        var el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+      }
+      function onClick(e) {
+        var btn = e.target.closest('.fav-btn[data-fav-url]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (btn.dataset.busy === '1') return;
+        btn.dataset.busy = '1';
+        fetch(btn.dataset.favUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken(),
+          },
+          body: new URLSearchParams({}),
+        })
+          .then(function (r) {
+            if (r.status === 401 || r.status === 403) {
+              window.location.href = '/accounts/login/?next=' + encodeURIComponent(location.pathname);
+              return null;
+            }
+            return r.json();
+          })
+          .then(function (data) {
+            if (!data) return;
+            var on = !!data.favorited;
+            btn.classList.toggle('is-fav', on);
+            btn.dataset.favorited = on ? '1' : '0';
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            var icon = btn.querySelector('.fav-heart');
+            if (icon) {
+              icon.classList.toggle('bi-heart-fill', on);
+              icon.classList.toggle('bi-heart', !on);
+            }
+          })
+          .catch(function () {})
+          .finally(function () { btn.dataset.busy = '0'; });
+      }
+      document.addEventListener('click', onClick);
+    })();
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

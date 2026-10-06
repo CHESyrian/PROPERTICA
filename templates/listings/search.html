@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Search" %} — {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+{% endblock %}
+
+{% block content %}<div class="search-layout">
+  <aside class="filters filters-card">
+    <form method="get">
+      <h2>{% trans "Filters" %}</h2>
+      <label>Keyword
+        <input type="search" name="q" value="{{ current_filters.q }}">
+      </label>
+      <label>Category
+        <select name="category">
+          <option value="">Any</option>
+          {% for c in categories %}
+            <option value="{{ c.code }}" {% if current_filters.category == c.code %}selected{% endif %}>{{ c.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>City
+        <input type="text" name="city" value="{{ current_filters.city }}">
+      </label>
+      <label>Price min
+        <input type="number" name="price_min" value="{{ current_filters.price_min }}">
+      </label>
+      <label>Price max
+        <input type="number" name="price_max" value="{{ current_filters.price_max }}">
+      </label>
+      <label>Currency
+        <select name="currency">
+          <option value="">Any</option>
+          <option value="EUR" {% if current_filters.currency == "EUR" %}selected{% endif %}>EUR</option>
+          <option value="USD" {% if current_filters.currency == "USD" %}selected{% endif %}>USD</option>
+          <option value="SYP" {% if current_filters.currency == "SYP" %}selected{% endif %}>SYP</option>
+          <option value="GBP" {% if current_filters.currency == "GBP" %}selected{% endif %}>GBP</option>
+        </select>
+      </label>
+      <label>Sort
+        <select name="sort">
+          <option value="newest" {% if current_filters.sort == "newest" %}selected{% endif %}>Newest</option>
+          <option value="price_asc" {% if current_filters.sort == "price_asc" %}selected{% endif %}>Price ↑</option>
+          <option value="price_desc" {% if current_filters.sort == "price_desc" %}selected{% endif %}>Price ↓</option>
+        </select>
+      </label>
+      <details class="geo-filters"{% if current_filters.lat or current_filters.radius_km %} open{% endif %}>
+        <summary>Distance (map center)</summary>
+        <label>Latitude
+          <input type="number" step="any" name="lat" value="{{ current_filters.lat }}" placeholder="e.g. 33.51">
+        </label>
+        <label>Longitude
+          <input type="number" step="any" name="lng" value="{{ current_filters.lng }}" placeholder="e.g. 36.29">
+        </label>
+        <label>Radius
+          <select name="radius_km">
+            <option value="">Any</option>
+            <option value="5" {% if current_filters.radius_km == "5" %}selected{% endif %}>5 km</option>
+            <option value="10" {% if current_filters.radius_km == "10" %}selected{% endif %}>10 km</option>
+            <option value="25" {% if current_filters.radius_km == "25" %}selected{% endif %}>25 km</option>
+            <option value="50" {% if current_filters.radius_km == "50" %}selected{% endif %}>50 km</option>
+            <option value="100" {% if current_filters.radius_km == "100" %}selected{% endif %}>100 km</option>
+          </select>
+        </label>
+        <p class="hint">Use city center coordinates + radius to limit results by distance.</p>
+      </details>
+      <button type="submit" class="btn btn-primary">Apply</button>
+    </form>
+  </aside>
+
+  <div class="results">
+    <div class="results-area" x-data="{ showMap: true }">
+    <div class="results-toolbar">
+      <p class="result-count">{{ page_obj.paginator.count }} listing{{ page_obj.paginator.count|pluralize }}</p>
+      <div class="view-toggle">
+        {% if user.is_authenticated %}
+          <details class="save-search-details">
+            <summary class="btn btn-sm">Save search</summary>
+            <form method="post" action="{% url 'listings:save_search' %}" class="save-search-form">
+              {% csrf_token %}
+              <input type="hidden" name="q" value="{{ current_filters.q }}">
+              <input type="hidden" name="category" value="{{ current_filters.category }}">
+              <input type="hidden" name="city" value="{{ current_filters.city }}">
+              <input type="hidden" name="price_min" value="{{ current_filters.price_min }}">
+              <input type="hidden" name="price_max" value="{{ current_filters.price_max }}">
+              <input type="hidden" name="sort" value="{{ current_filters.sort }}">
+              <label>Name
+                <input type="text" name="name" placeholder="e.g. Damascus apartments" maxlength="120" required>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="notify_by_email" checked> Email me new matches
+              </label>
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            </form>
+          </details>
+          <a href="{% url 'listings:saved_searches' %}" class="btn btn-sm">My saved searches</a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm">Log in to save search</a>
+        {% endif %}
+        <button type="button" class="btn btn-sm" @click="showMap = false" :class="{ 'btn-primary': !showMap }">List</button>
+        <button type="button" class="btn btn-sm" @click="showMap = true; $nextTick(() => window.dispatchEvent(new Event('resize')))" :class="{ 'btn-primary': showMap }">Map</button>
+      </div>
+    </div>
+
+    <div class="results-split" :class="{ 'list-only': !showMap }">
+      <div class="results-list" id="results-list" :class="{ 'half': showMap }">
+        <div class="listing-grid">
+          {% for listing in listings %}
+            {% include "listings/_card.html" with listing=listing %}
+          {% empty %}
+            <p>No listings match your filters.</p>
+          {% endfor %}
+        </div>
+        {% if page_obj.has_other_pages %}
+          <nav class="pagination">
+            {% if page_obj.has_previous %}
+              <a href="?page={{ page_obj.previous_page_number }}&q={{ current_filters.q }}&category={{ current_filters.category }}&city={{ current_filters.city }}&price_min={{ current_filters.price_min }}&price_max={{ current_filters.price_max }}&sort={{ current_filters.sort }}">Previous</a>
+            {% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+              <a href="?page={{ page_obj.next_page_number }}&q={{ current_filters.q }}&category={{ current_filters.category }}&city={{ current_filters.city }}&price_min={{ current_filters.price_min }}&price_max={{ current_filters.price_max }}&sort={{ current_filters.sort }}">Next</a>
+            {% endif %}
+          </nav>
+        {% endif %}
+      </div>
+      <div class="results-map" id="search-map" x-show="showMap" x-cloak></div>
+    </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var pins = {{ map_pins_json|safe }};
+  var el = document.getElementById('search-map');
+  if (!el || typeof L === 'undefined') return;
+
+  var defaultCenter = [34.8021, 38.9968];
+  var mapLang = (document.documentElement.getAttribute('data-map-lang') || 'en').slice(0, 2);
+  var map = L.map(el).setView(defaultCenter, 7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    attribution: mapLang === 'ar' ? '&copy; OpenStreetMap | خريطة' : '&copy; OpenStreetMap'
+  }).addTo(map);
+  map.getContainer().setAttribute('lang', mapLang);
+
+  var viewLabel = mapLang === 'ar' ? 'عرض' : 'View';
+  var bounds = [];
+  pins.forEach(function (p) {
+    var m = L.marker([p.lat, p.lng]).addTo(map);
+    m.bindPopup(
+      '<strong>' + p.title + '</strong><br>' +
+      p.currency + ' ' + p.price +
+      '<br><a href="' + p.url + '">' + viewLabel + '</a>'
+    );
+    bounds.push([p.lat, p.lng]);
+  });
+  if (bounds.length) {
+    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+  }
+  setTimeout(function () { map.invalidateSize(); }, 150);
+})();
+</script>
+{% endblock %}
